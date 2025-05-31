@@ -1,0 +1,1864 @@
+openapi: 3.0.1
+info:
+  title: IATI Datastore
+  description: "IATI Datastore API. Uses Apache Solr to index IATI data and provide search capabilities. Provides routes for querying all IATI data that is not critically invalid as determined by the [IATI Validator](https://iativalidator.iatistandard.org/).\n\nThe API adheres to the [IATI Datastore version 3 API Contract](https://cdn.iatistandard.org/prod-iati-website/documents/IATI_Datastore_version_3_API_Contract.pdf).\n"
+  version: '1.0'
+servers:
+  - url: https://api.iatistandard.org/datastore
+paths:
+  '/{collection}/{responsetype}':
+    get:
+      tags:
+        - datastore
+        - query
+        - GET
+      summary: Query
+      description: "Query the IATI Datastore.\n\nThe API capabilities are adapted from the Solr 8.10 API documentation and abbreviated to form a summary - for more detailed documentation on any of the parameters supported by the IATI Standard Query Parser please refer to the [Solr 8.10 API documentation](https://solr.apache.org/guide/8_10/the-standard-query-parser.html)\n\nGitHub:\n\n[IATI/refresher](https://github.com/IATI/refresher)\n\n[IATI/datastore-solr-configs](https://github.com/IATI/datastore-solr-configs)"
+      operationId: query
+      parameters:
+        - name: collection
+          in: path
+          description: "Defines which collection to query. The activity collection holds the data in one document per IATI Activity element. The transaction collection explodes the data to include one document per Transaction element. The budget collection explodes the data to include one document per Budget element.\n"
+          required: true
+          schema:
+            enum:
+              - activity
+              - budget
+              - transaction
+            type: string
+        - name: responsetype
+          in: path
+          description: "Defines whether the response is standard Solr (select), in IATI XML format (iati), or structured JSON format (iati_json). Only available for the /activity/ collection path.\n"
+          required: true
+          schema:
+            enum:
+              - select
+              - iati
+              - iati_json
+            type: string
+            default: select
+        - name: q
+          in: query
+          description: 'Defines a query using standard query syntax. This parameter is mandatory. E.g. search activity description narratives for NGO: q=description_narrative:NGO'
+          required: true
+          schema:
+            type: string
+        - name: q.op
+          in: query
+          description: Specifies the default operator for query expressions. Possible values are "AND" or "OR".
+          schema:
+            type: string
+            default: OR
+        - name: df
+          in: query
+          description: Specifies a default searchable field. E.g. df=description_narrative
+          schema:
+            type: string
+        - name: sow
+          in: query
+          description: 'Split on whitespace. If set to true, text analysis is invoked separately for each individual whitespace-separated term. The default is false.'
+          schema:
+            type: boolean
+            default: false
+        - name: sort
+          in: query
+          description: 'The sort parameter arranges search results in either ascending (asc) or descending (desc) order. The parameter can be used with either numerical or alphabetical content. The directions can be entered in either all lowercase or all uppercase letters (i.e., both asc and ASC are accepted). E.g. sort=iati_identifier desc would sort in descending alphabetical order on iati_identifier.'
+          schema:
+            type: string
+        - name: start
+          in: query
+          description: 'When specified, the start parameter specifies an offset into a query’s result set and instructs Solr to begin displaying results from this offset. used in conjunction with rows for pagination. E.g.  start=50 would return the 50th document onward.'
+          schema:
+            type: int
+        - name: rows
+          in: query
+          description: 'You can use the rows parameter to paginate results from a query. The parameter specifies the maximum number of documents from the complete result set that Solr should return to the client at one time. The default value is 10. That is, by default, Solr returns 10 documents at a time in response to a query.'
+          schema:
+            type: int
+        - name: fq
+          in: query
+          description: 'The fq (Filter Query) parameter defines a query that can be used to restrict the superset of documents that can be returned, without influencing score. It can be very useful for speeding up complex queries, since the queries specified with fq are cached independently of the main query. When a later query uses the same filter, there’s a cache hit, and filter results are returned quickly from the cache. E.g. fq=budget_value:[10000000 TO *] would restrict the queried documents to those with budget_value''s greater than 10mil.'
+          schema:
+            type: string
+        - name: fl
+          in: query
+          description: "The fl parameter limits the information included in a query response to a specified list of fields. The fields must be either stored=\"true\" or docValues=\"true\". E.g. fl=iati_identifier,reporting_org_ref returns the iati_identifier and reporting_org_ref for each result document.\n\nThe field list can be specified as a space-separated or comma-separated list of field names. The string \"score\" can be used to indicate that the score of each document for the particular query should be returned as a field.\n\nThe wildcard character * selects all the fields in the document which are either stored=\"true\" or docValues=\"true\" and useDocValuesAsStored=\"true\" (which is the default when docValues are enabled). You can also add pseudo-fields, functions and transformers to the field list request.\n\nDefaults to the IATI fields as defined by the v2.03 Schema"
+          schema:
+            type: string
+        - name: timeAllowed
+          in: query
+          description: 'This parameter specifies the amount of time, in milliseconds, allowed for a search to complete. If this time expires before the search is complete, any partial results will be returned, but values such as numFound, facet counts, and result stats may not be accurate for the entire result set. E.g. timeAllowed=1000 indicates 1 second.'
+          schema:
+            type: int
+        - name: wt
+          in: query
+          description: "The wt parameter selects the format of the response. The accepted values are either json, csv, or xml  for all collections, and they return the standard Solr response from those response writers.\n\nAdditionally, for the Activity collection the API supports a custom response, iati. This returns an XML document containing each Activity in exactly the form it was originally published.\n"
+          schema:
+            type: string
+            default: json
+        - name: group
+          in: query
+          description: "If true, query results will be grouped.\n\nSee [Result Grouping](https://solr.apache.org/guide/8_10/result-grouping.html) solr documentation for more detail and examples."
+          schema:
+            type: boolean
+            default: false
+        - name: group.field
+          in: query
+          description: "The name of the field by which to group results. The field must be single-valued, and either be indexed or a field type that has a value source and works in a function query, such as ExternalFileField. It must also be a string-based field, such as StrField or TextField\n\nAs per the nature of the architecture of Solr as inherited from version 2, many fields are by necessity multi-valued. For example, an Activity can have many Transactions, and therefore in the Activity collection the transaction field is multi-valued, and as such can not be used to group by.\n\nE.g. group=true&group.field=reporting_org_ref would group the query results by the reporting_org_ref."
+          schema:
+            type: string
+        - name: facet
+          in: query
+          description: "If set to true, this parameter enables facet counts in the query response. If set to false, a blank or missing value, this parameter disables faceting. None of the other parameters listed below will have any effect unless this parameter is set to true. The default value is blank (false).\n\nSee the [Faceting](https://solr.apache.org/guide/8_10/faceting.html) Solr documentation for more detail and examples."
+          schema:
+            type: boolean
+            default: false
+        - name: facet.field
+          in: query
+          description: "The facet.field parameter identifies a field that should be treated as a facet. It iterates over each Term in the field and generates a facet count using that Term as the constraint. This parameter can be specified multiple times in a query to select multiple facet fields. \n\nIf you do not set this parameter to at least one field in the schema, none of the other facet parameters will have any effect."
+          schema:
+            type: string
+        - name: facet.prefix
+          in: query
+          description: 'The facet.prefix parameter limits the terms on which to facet to those starting with the given string prefix. This does not limit the query in any way, only the facets that would be returned in response to the query.'
+          schema:
+            type: string
+        - name: facet.contains
+          in: query
+          description: 'The facet.contains parameter limits the terms on which to facet to those containing the given substring. This does not limit the query in any way, only the facets that would be returned in response to the query.'
+          schema:
+            type: string
+        - name: facet.contains.ignoreCase
+          in: query
+          description: 'If facet.contains is used, the facet.contains.ignoreCase parameter causes case to be ignored when matching the given substring against candidate facet terms.'
+          schema:
+            type: boolean
+        - name: facet.matches
+          in: query
+          description: If you want to only return facet buckets for the terms that match a regular expression.
+          schema:
+            type: boolean
+        - name: facet.sort
+          in: query
+          description: "This parameter determines the ordering of the facet field constraints.\nThere are two options for this parameter.\ncount\nSort the constraints by count (highest count first).\nindex\nReturn the constraints sorted in their index order (lexicographic by indexed term). For terms in the ASCII range, this will be alphabetically sorted.\nThe default is count if facet.limit is greater than 0, otherwise, the default is index."
+          schema:
+            type: string
+        - name: facet.limit
+          in: query
+          description: "This parameter specifies the maximum number of constraint counts (essentially, the number of facets for a field that are returned) that should be returned for the facet fields. A negative value means that Solr will return an unlimited number of constraint counts.\nThe default value is 100.\n"
+          schema:
+            type: int
+        - name: facet.offset
+          in: query
+          description: "The facet.offset parameter indicates an offset into the list of constraints to allow paging.\nThe default value is 0.\n"
+          schema:
+            type: int
+        - name: facet.mincount
+          in: query
+          description: "The facet.mincount parameter specifies the minimum counts required for a facet field to be included in the response. If a field’s counts are below the minimum, the field’s facet is not returned.\nThe default value is 0."
+          schema:
+            type: int
+        - name: facet.missing
+          in: query
+          description: "If set to true, this parameter indicates that, in addition to the Term-based constraints of a facet field, a count of all results that match the query but which have no facet value for the field should be computed and returned in the response.\nThe default value is false."
+          schema:
+            type: boolean
+        - name: facet.method
+          in: query
+          description: "The facet.method parameter selects the type of algorithm or method Solr should use when faceting a field.\nThe following methods are available.\n\nenum\nEnumerates all terms in a field, calculating the set intersection of documents that match the term with documents that match the query.\nThis method is recommended for faceting multi-valued fields that have only a few distinct values. \n\nfc (default)\nCalculates facet counts by iterating over documents that match the query and summing the terms that appear in each document.\n"
+          schema:
+            type: string
+            default: fc
+        - name: facet.exists
+          in: query
+          description: 'To cap facet counts by 1, specify facet.exists=true. This parameter can be used with facet.method=enum or when it’s omitted. It can be used only on non-trie fields (such as strings). It may speed up facet counting on large indices and/or high-cardinality facet values.'
+          schema:
+            type: boolean
+        - name: facet.excludeTerms
+          in: query
+          description: 'If you want to remove terms from facet counts but keep them in the index, the facet.excludeTerms parameter allows you to do that.'
+          schema:
+            type: boolean
+        - name: facet.range
+          in: query
+          description: The facet.range parameter defines the field for which Solr should create range facets.
+          schema:
+            type: string
+        - name: facet.range.start
+          in: query
+          description: "Specifies the lower bound of the ranges.\n"
+          schema:
+            type: string
+        - name: facet.range.end
+          in: query
+          description: Specifies the upper bound of the ranges.
+          schema:
+            type: string
+        - name: facet.range.gap
+          in: query
+          description: The span of each range expressed as a value to be added to the lower bound. You can specify this parameter on a per-field basis with the syntax of f.<fieldname>.facet.range.gap.
+          schema:
+            type: string
+        - name: facet.range.other
+          in: query
+          description: "The facet.range.other parameter specifies that in addition to the counts for each range constraint between facet.range.start and facet.range.end, counts should also be computed for these options:\nbefore: All records with field values lower than the lower bound of the first range.\nafter: All records with field values greater than the upper bound of the last range.\nbetween: All records with field values between the start and end bounds of all ranges.\nnone: Do not compute any counts.\nall: Compute counts for before, between, and after.\n"
+          schema:
+            type: string
+            default: none
+        - name: facet.pivot
+          in: query
+          description: 'Pivoting is a summarization tool that lets you automatically sort, count, total or average data stored in a table. The facet.pivot parameter defines the fields to use for the pivot. Multiple facet.pivot values will create multiple "facet_pivot" sections in the response. Separate each list of fields with a comma.'
+          schema:
+            type: string
+        - name: facet.pivot.mincount
+          in: query
+          description: The facet.pivot.mincount parameter defines the minimum number of documents that need to match in order for the facet to be included in results. The default is 1.
+          schema:
+            type: int
+        - name: csv.encapsulator
+          in: query
+          description: "Used if wt=csv. encapsulator character for csv response. Default is \"\n\nSee [CSV Response Writer](https://solr.apache.org/guide/8_10/response-writers.html#csv-response-writer) solr documentation for more detail."
+          schema:
+            type: string
+        - name: csv.escape
+          in: query
+          description: Used if wt=csv. escape character for csv response. Default is None
+          schema:
+            type: string
+        - name: csv.separator
+          in: query
+          description: 'Used if wt=csv. separator character for csv response. Default is ,'
+          schema:
+            type: string
+        - name: csv.header
+          in: query
+          description: 'Used if wt=csv. Defaults to true. If false, Solr does not print the column headers'
+          schema:
+            type: boolean
+        - name: csv.newline
+          in: query
+          description: Used if wt=csv. newline character for csv response. Default is \n
+          schema:
+            type: string
+        - name: csv.null
+          in: query
+          description: Used if wt=csv. Defaults to a zero length string. Use this parameter when a document has no value for a particular field.
+          schema:
+            type: string
+        - name: csv.mv.encapsulator
+          in: query
+          description: Used if wt=csv. encapsulator character for multi-valued fields in csv response. Default is None
+          schema:
+            type: string
+        - name: csv.mv.escape
+          in: query
+          description: Used if wt=csv. escape character for multi-valued fields in csv response. Default is \
+          schema:
+            type: string
+        - name: csv.mv.separator
+          in: query
+          description: Used if wt=csv. separator character for multi-valued fields in csv response. Defaults to the csv.separator value.
+          schema:
+            type: string
+        - name: sfield
+          in: query
+          description: 'Used if fq={!geofilt} for great circle distance or fq={!bbox} for the bounding box of the calculated circle. Identifies the field that should be used as the spatial index.'
+          schema:
+            type: string
+        - name: pt
+          in: query
+          description: 'Used if fq={!geofilt} for great circle distance or fq={!bbox} for the bounding box of the calculated circle. The center point using the format "lat,lon".'
+          schema:
+            type: string
+        - name: d
+          in: query
+          description: 'Used if fq={!geofilt} for great circle distance or fq={!bbox} for the bounding box of the calculated circle. Radial distance as measured in kilometers.'
+          schema:
+            type: float
+      responses:
+        '200':
+          description: "Example Responses with all IATI fields in the returned document. \n\nMain formatting differences are based on the wt query parameter:\n\n* default and wt=json - application/json\n* wt=csv - text/plain in .csv format\n* wt=xml - application/xml in Solr XML format"
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                default: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Query_Response_All_IATI_Fields'
+              example:
+                responseHeader:
+                  zkConnected: false
+                  status: 0
+                  QTime: 0
+                  params:
+                    q: string
+                    start: string
+                    rows: string
+                    wt: string
+                response:
+                  numFound: 0
+                  start: 0
+                  numFoundExact: false
+                  docs:
+                    - dataset_version: string
+                      dataset_linked_data_default: string
+                      dataset_generated_datetime: string
+                      xml_lang: string
+                      default_currency: string
+                      last_updated_datetime: string
+                      humanitarian: string
+                      linked_data_uri: string
+                      hierarchy: string
+                      budget_not_provided: string
+                      iati_identifier: string
+                      reporting_org_ref: string
+                      reporting_org_type: string
+                      reporting_org_secondary_reporter: string
+                      reporting_org_narrative:
+                        - string
+                      reporting_org_narrative_xml_lang:
+                        - string
+                      title_narrative:
+                        - string
+                      title_narrative_xml_lang:
+                        - string
+                      description_type:
+                        - string
+                      description_narrative:
+                        - string
+                      description_narrative_xml_lang:
+                        - string
+                      participating_org_ref:
+                        - string
+                      participating_org_role:
+                        - string
+                      participating_org_type:
+                        - string
+                      participating_org_activity_id:
+                        - string
+                      participating_org_crs_channel_code:
+                        - string
+                      participating_org_narrative:
+                        - string
+                      participating_org_narrative_xml_lang:
+                        - string
+                      other_identifier_ref: string
+                      other_identifier_type: string
+                      other_identifier_owner_org_ref: string
+                      other_identifier_owner_org_narrative: string
+                      activity_status_code: string
+                      activity_date_iso_date:
+                        - string
+                      activity_date_type:
+                        - string
+                      activity_date_narrative:
+                        - string
+                      activity_date_narrative_xml_lang:
+                        - string
+                      contact_info_type: string
+                      contact_info_organisation_narrative: string
+                      contact_info_department_narrative: string
+                      contact_info_person_name_narrative: string
+                      contact_info_job_title_narrative: string
+                      contact_info_telephone: string
+                      contact_info_email: string
+                      contact_info_website: string
+                      contact_info_mailing_address_narrative: string
+                      activity_scope_code: string
+                      recipient_country_code:
+                        - string
+                      recipient_country_percentage:
+                        - string
+                      recipient_region_code:
+                        - string
+                      recipient_region_vocabulary:
+                        - string
+                      recipient_region_percentage:
+                        - string
+                      recipient_region_vocabulary_uri:
+                        - string
+                      location_ref:
+                        - string
+                      location_location_reach_code:
+                        - string
+                      location_location_id_vocabulary:
+                        - string
+                      location_location_id_code:
+                        - string
+                      location_name_narrative:
+                        - string
+                      location_description_narrative:
+                        - string
+                      location_activity_description_narrative:
+                        - string
+                      location_administrative_vocabulary:
+                        - string
+                      location_administrative_level:
+                        - string
+                      location_administrative_code:
+                        - string
+                      location_point_srsName:
+                        - string
+                      location_point_pos:
+                        - string
+                      location_exactness_code:
+                        - string
+                      location_location_class_code:
+                        - string
+                      location_feature_designation_code:
+                        - string
+                      sector_vocabulary:
+                        - string
+                      sector_code:
+                        - string
+                      sector_percentage:
+                        - string
+                      sector_vocabulary_uri:
+                        - string
+                      sector_narrative: string
+                      tag_vocabulary:
+                        - string
+                      tag_code:
+                        - string
+                      tag_vocabulary_uri:
+                        - string
+                      tag_narrative:
+                        - string
+                      country_budget_items_vocabulary: string
+                      country_budget_items_budget_item_code:
+                        - string
+                      country_budget_items_budget_item_percentage:
+                        - string
+                      country_budget_items_budget_item_description_narrative:
+                        - string
+                      humanitarian_scope_type:
+                        - string
+                      humanitarian_scope_vocabulary:
+                        - string
+                      humanitarian_scope_code:
+                        - string
+                      humanitarian_scope_vocabulary_uri:
+                        - string
+                      humanitarian_scope_narrative:
+                        - string
+                      humanitarian_scope_narrative_xml_lang:
+                        - string
+                      policy_marker_vocabulary:
+                        - string
+                      policy_marker_code:
+                        - string
+                      policy_marker_significance:
+                        - string
+                      policy_marker_vocabulary_uri:
+                        - string
+                      policy_marker_narrative: string
+                      collaboration_type_code: string
+                      default_flow_type_code: string
+                      default_finance_type_code: string
+                      default_aid_type_code:
+                        - string
+                      default_aid_type_vocabulary:
+                        - string
+                      default_tied_status_code: string
+                      budget_type: string
+                      budget_status: string
+                      budget_period_start_iso_date: string
+                      budget_period_end_iso_date: string
+                      budget_value: string
+                      budget_value_currency: string
+                      budget_value_value_date: string
+                      planned_disbursement_type:
+                        - string
+                      planned_disbursement_period_start_iso_date:
+                        - string
+                      planned_disbursement_period_end_iso_date:
+                        - string
+                      planned_disbursement_value:
+                        - string
+                      planned_disbursement_value_currency:
+                        - string
+                      planned_disbursement_value_value_date:
+                        - string
+                      planned_disbursement_provider_org_provider_activity_id: string
+                      planned_disbursement_provider_org_type: string
+                      planned_disbursement_provider_org_ref: string
+                      planned_disbursement_provider_org_narrative: string
+                      planned_disbursement_receiver_org_receiver_activity_id: string
+                      planned_disbursement_receiver_org_type: string
+                      planned_disbursement_receiver_org_ref: string
+                      planned_disbursement_receiver_org_narrative: string
+                      capital_spend_percentage: string
+                      transaction_ref: string
+                      transaction_humanitarian: string
+                      transaction_transaction_type_code: string
+                      transaction_transaction_date_iso_date: string
+                      transaction_value: string
+                      transaction_value_currency: string
+                      transaction_value_value_date: string
+                      transaction_description_narrative: string
+                      transaction_provider_org_provider_activity_id: string
+                      transaction_provider_org_type: string
+                      transaction_provider_org_ref: string
+                      transaction_provider_org_narrative: string
+                      transaction_receiver_org_receiver_activity_id: string
+                      transaction_receiver_org_type: string
+                      transaction_receiver_org_ref: string
+                      transaction_receiver_org_narrative: string
+                      transaction_disbursement_channel_code: string
+                      transaction_flow_type_code: string
+                      transaction_finance_type_code: string
+                      transaction_aid_type_code:
+                        - string
+                      transaction_aid_type_vocabulary:
+                        - string
+                      transaction_tied_status_code: string
+                      document_link_format: string
+                      document_link_url: string
+                      document_link_title_narrative:
+                        - string
+                      document_link_title_narrative_xml_lang:
+                        - string
+                      document_link_description_narrative: string
+                      document_link_category_code: string
+                      document_link_language_code: string
+                      document_link_document_date_iso_date: string
+                      related_activity_ref: string
+                      related_activity_type: string
+                      legacy_data_name:
+                        - string
+                      legacy_data_value:
+                        - string
+                      legacy_data_iati_equivalent:
+                        - string
+                      conditions_attached: string
+                      conditions_condition_type: string
+                      conditions_condition_narrative:
+                        - string
+                      conditions_condition_narrative_xml_lang:
+                        - string
+                      result_type: string
+                      result_aggregation_status: string
+                      result_title_narrative: string
+                      result_description_narrative: string
+                      result_document_link_format: string
+                      result_document_link_url: string
+                      result_document_link_title_narrative: string
+                      result_document_link_description_narrative: string
+                      result_document_link_category_code: string
+                      result_document_link_language_code: string
+                      result_document_link_document_date_iso_date: string
+                      result_indicator_measure: string
+                      result_indicator_ascending: string
+                      result_indicator_aggregation_status: string
+                      result_indicator_title_narrative: string
+                      result_indicator_description_narrative: string
+                      result_indicator_document_link_format: string
+                      result_indicator_document_link_url: string
+                      result_indicator_document_link_title_narrative: string
+                      result_indicator_document_link_description_narrative: string
+                      result_indicator_document_link_category_code: string
+                      result_indicator_document_link_language_code: string
+                      result_indicator_document_link_document_date_iso_date: string
+                      result_indicator_reference_vocabulary:
+                        - string
+                      result_indicator_reference_code:
+                        - string
+                      result_indicator_reference_indicator_uri:
+                        - string
+                      result_indicator_baseline_year: string
+                      result_indicator_baseline_iso_date: string
+                      result_indicator_baseline_value: string
+                      result_indicator_baseline_location_ref:
+                        - string
+                      result_indicator_baseline_dimension_name:
+                        - string
+                      result_indicator_baseline_dimension_value:
+                        - string
+                      result_indicator_baseline_document_link_format: string
+                      result_indicator_baseline_document_link_url: string
+                      result_indicator_baseline_document_link_title_narrative: string
+                      result_indicator_baseline_document_link_description_narrative: string
+                      result_indicator_baseline_document_link_category_code: string
+                      result_indicator_baseline_document_link_language_code: string
+                      result_indicator_baseline_document_link_document_date_iso_date: string
+                      result_indicator_baseline_comment_narrative: string
+                      result_indicator_period_period_start_iso_date: string
+                      result_indicator_period_period_end_iso_date: string
+                      result_indicator_period_target_value: string
+                      result_indicator_period_target_location_ref:
+                        - string
+                      result_indicator_period_target_dimension_name:
+                        - string
+                      result_indicator_period_target_dimension_value:
+                        - string
+                      result_indicator_period_target_comment_narrative: string
+                      result_indicator_period_target_document_link_format: string
+                      result_indicator_period_target_document_link_url: string
+                      result_indicator_period_target_document_link_title_narrative: string
+                      result_indicator_period_target_document_link_description_narrative: string
+                      result_indicator_period_target_document_link_category_code: string
+                      result_indicator_period_target_document_link_language_code: string
+                      result_indicator_period_target_document_link_document_date_iso_date: string
+                      result_indicator_period_actual_value: string
+                      result_indicator_period_actual_location_ref:
+                        - string
+                      result_indicator_period_actual_dimension_name:
+                        - string
+                      result_indicator_period_actual_dimension_value:
+                        - string
+                      result_indicator_period_actual_comment_narrative: string
+                      result_indicator_period_actual_document_link_format: string
+                      result_indicator_period_actual_document_link_url: string
+                      result_indicator_period_actual_document_link_title_narrative: string
+                      result_indicator_period_actual_document_link_description_narrative: string
+                      result_indicator_period_actual_document_link_category_code: string
+                      result_indicator_period_actual_document_link_language_code: string
+                      result_indicator_period_actual_document_link_document_date_iso_date: string
+                      crs_add_other_flags_code: string
+                      crs_add_other_flags_significance: string
+                      crs_add_loan_terms_rate_1: string
+                      crs_add_loan_terms_rate_2: string
+                      crs_add_loan_terms_repayment_type_code: string
+                      crs_add_loan_terms_repayment_plan_code: string
+                      crs_add_loan_terms_commitment_date_iso_date: string
+                      crs_add_loan_terms_repayment_first_date_iso_date: string
+                      crs_add_loan_terms_repayment_final_date_iso_date: string
+                      crs_add_loan_status_year: string
+                      crs_add_loan_status_currency: string
+                      crs_add_loan_status_value_date: string
+                      crs_add_loan_status_interest_received: string
+                      crs_add_loan_status_principal_outstanding: string
+                      crs_add_loan_status_principal_arrears: string
+                      crs_add_loan_status_interest_arrears: string
+                      crs_add_channel_code: string
+                      fss_extraction_date: string
+                      fss_priority: string
+                      fss_phaseout_year: string
+                      fss_forecast: string
+                      fss_forecast_year: string
+                      fss_forecast_value_date: string
+                      fss_forecast_currency: string
+        '400':
+          description: Example 400 Response. Incorrect query parameter.
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                default: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invalid_Query_Parameter_Response__400_'
+              example:
+                responseHeader:
+                  zkConnected: true
+                  status: 0
+                  QTime: 0
+                  params:
+                    sort: string
+                    rows: string
+                error:
+                  metadata:
+                    - string
+                  msg: string
+                  code: 0
+  /iati-identifiers/exist:
+    post:
+      summary: Check whether IATI Identifiers exist
+      description: 'This API endpoint allows the user to check which from a list of IATI Identifiers exist in the IATI Datastore. A list of the identifiers found will be returned, along with a count of how many times they occur in the Datastore.'
+      operationId: iati-identifiers-exist
+      requestBody:
+        description: 'Request body should be a JSON dictionary with one key, ''iati_identifiers'', the value of which should be a list of strings, each one being an IATI Identifier.'
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Identifier_Existence_-_Request_'
+            example:
+              iati_identifiers:
+                - AA-AAA-GOV-0123456
+                - AA-AAB-GOV-7890123
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/'
+              example:
+                message: OK
+                detail: ''
+                unique_iati_identifiers_found: 0
+                total_iati_identifier_occurrences: 0
+                num_iati_identifiers_not_found: 2
+                iati_identifiers_found: { }
+                iati_identifiers_not_found:
+                  AA-AAA-GOV-0123456: { }
+                  AA-AAB-GOV-7890123: { }
+        '400':
+          description: ''
+        '401':
+          description: ''
+components:
+  schemas:
+    Query_Response_All_IATI_Fields:
+      type: object
+      properties:
+        responseHeader:
+          type: object
+          properties:
+            zkConnected:
+              type: boolean
+            status:
+              type: integer
+            QTime:
+              type: integer
+            params:
+              type: object
+              properties:
+                q:
+                  type: string
+                start:
+                  type: string
+                rows:
+                  type: string
+                wt:
+                  type: string
+        response:
+          type: object
+          properties:
+            numFound:
+              type: integer
+            start:
+              type: integer
+            numFoundExact:
+              type: boolean
+            docs:
+              type: array
+              items:
+                type: object
+                properties:
+                  dataset_version:
+                    type: string
+                  dataset_linked_data_default:
+                    type: string
+                  dataset_generated_datetime:
+                    type: string
+                  xml_lang:
+                    type: string
+                  default_currency:
+                    type: string
+                  last_updated_datetime:
+                    type: string
+                  humanitarian:
+                    type: string
+                  linked_data_uri:
+                    type: string
+                  hierarchy:
+                    type: string
+                  budget_not_provided:
+                    type: string
+                  iati_identifier:
+                    type: string
+                  reporting_org_ref:
+                    type: string
+                  reporting_org_type:
+                    type: string
+                  reporting_org_secondary_reporter:
+                    type: string
+                  reporting_org_narrative:
+                    type: array
+                    items:
+                      type: string
+                  reporting_org_narrative_xml_lang:
+                    type: array
+                    items:
+                      type: string
+                  title_narrative:
+                    type: array
+                    items:
+                      type: string
+                  title_narrative_xml_lang:
+                    type: array
+                    items:
+                      type: string
+                  description_type:
+                    type: array
+                    items:
+                      type: string
+                  description_narrative:
+                    type: array
+                    items:
+                      type: string
+                  description_narrative_xml_lang:
+                    type: array
+                    items:
+                      type: string
+                  participating_org_ref:
+                    type: array
+                    items:
+                      type: string
+                  participating_org_role:
+                    type: array
+                    items:
+                      type: string
+                  participating_org_type:
+                    type: array
+                    items:
+                      type: string
+                  participating_org_activity_id:
+                    type: array
+                    items:
+                      type: string
+                  participating_org_crs_channel_code:
+                    type: array
+                    items:
+                      type: string
+                  participating_org_narrative:
+                    type: array
+                    items:
+                      type: string
+                  participating_org_narrative_xml_lang:
+                    type: array
+                    items:
+                      type: string
+                  other_identifier_ref:
+                    type: string
+                  other_identifier_type:
+                    type: string
+                  other_identifier_owner_org_ref:
+                    type: string
+                  other_identifier_owner_org_narrative:
+                    type: string
+                  activity_status_code:
+                    type: string
+                  activity_date_iso_date:
+                    type: array
+                    items:
+                      type: string
+                  activity_date_type:
+                    type: array
+                    items:
+                      type: string
+                  activity_date_narrative:
+                    type: array
+                    items:
+                      type: string
+                  activity_date_narrative_xml_lang:
+                    type: array
+                    items:
+                      type: string
+                  contact_info_type:
+                    type: string
+                  contact_info_organisation_narrative:
+                    type: string
+                  contact_info_department_narrative:
+                    type: string
+                  contact_info_person_name_narrative:
+                    type: string
+                  contact_info_job_title_narrative:
+                    type: string
+                  contact_info_telephone:
+                    type: string
+                  contact_info_email:
+                    type: string
+                  contact_info_website:
+                    type: string
+                  contact_info_mailing_address_narrative:
+                    type: string
+                  activity_scope_code:
+                    type: string
+                  recipient_country_code:
+                    type: array
+                    items:
+                      type: string
+                  recipient_country_percentage:
+                    type: array
+                    items:
+                      type: string
+                  recipient_region_code:
+                    type: array
+                    items:
+                      type: string
+                  recipient_region_vocabulary:
+                    type: array
+                    items:
+                      type: string
+                  recipient_region_percentage:
+                    type: array
+                    items:
+                      type: string
+                  recipient_region_vocabulary_uri:
+                    type: array
+                    items:
+                      type: string
+                  location_ref:
+                    type: array
+                    items:
+                      type: string
+                  location_location_reach_code:
+                    type: array
+                    items:
+                      type: string
+                  location_location_id_vocabulary:
+                    type: array
+                    items:
+                      type: string
+                  location_location_id_code:
+                    type: array
+                    items:
+                      type: string
+                  location_name_narrative:
+                    type: array
+                    items:
+                      type: string
+                  location_description_narrative:
+                    type: array
+                    items:
+                      type: string
+                  location_activity_description_narrative:
+                    type: array
+                    items:
+                      type: string
+                  location_administrative_vocabulary:
+                    type: array
+                    items:
+                      type: string
+                  location_administrative_level:
+                    type: array
+                    items:
+                      type: string
+                  location_administrative_code:
+                    type: array
+                    items:
+                      type: string
+                  location_point_srsName:
+                    type: array
+                    items:
+                      type: string
+                  location_point_pos:
+                    type: array
+                    items:
+                      type: string
+                  location_exactness_code:
+                    type: array
+                    items:
+                      type: string
+                  location_location_class_code:
+                    type: array
+                    items:
+                      type: string
+                  location_feature_designation_code:
+                    type: array
+                    items:
+                      type: string
+                  sector_vocabulary:
+                    type: array
+                    items:
+                      type: string
+                  sector_code:
+                    type: array
+                    items:
+                      type: string
+                  sector_percentage:
+                    type: array
+                    items:
+                      type: string
+                  sector_vocabulary_uri:
+                    type: array
+                    items:
+                      type: string
+                  sector_narrative:
+                    type: string
+                  tag_vocabulary:
+                    type: array
+                    items:
+                      type: string
+                  tag_code:
+                    type: array
+                    items:
+                      type: string
+                  tag_vocabulary_uri:
+                    type: array
+                    items:
+                      type: string
+                  tag_narrative:
+                    type: array
+                    items:
+                      type: string
+                  country_budget_items_vocabulary:
+                    type: string
+                  country_budget_items_budget_item_code:
+                    type: array
+                    items:
+                      type: string
+                  country_budget_items_budget_item_percentage:
+                    type: array
+                    items:
+                      type: string
+                  country_budget_items_budget_item_description_narrative:
+                    type: array
+                    items:
+                      type: string
+                  humanitarian_scope_type:
+                    type: array
+                    items:
+                      type: string
+                  humanitarian_scope_vocabulary:
+                    type: array
+                    items:
+                      type: string
+                  humanitarian_scope_code:
+                    type: array
+                    items:
+                      type: string
+                  humanitarian_scope_vocabulary_uri:
+                    type: array
+                    items:
+                      type: string
+                  humanitarian_scope_narrative:
+                    type: array
+                    items:
+                      type: string
+                  humanitarian_scope_narrative_xml_lang:
+                    type: array
+                    items:
+                      type: string
+                  policy_marker_vocabulary:
+                    type: array
+                    items:
+                      type: string
+                  policy_marker_code:
+                    type: array
+                    items:
+                      type: string
+                  policy_marker_significance:
+                    type: array
+                    items:
+                      type: string
+                  policy_marker_vocabulary_uri:
+                    type: array
+                    items:
+                      type: string
+                  policy_marker_narrative:
+                    type: string
+                  collaboration_type_code:
+                    type: string
+                  default_flow_type_code:
+                    type: string
+                  default_finance_type_code:
+                    type: string
+                  default_aid_type_code:
+                    type: array
+                    items:
+                      type: string
+                  default_aid_type_vocabulary:
+                    type: array
+                    items:
+                      type: string
+                  default_tied_status_code:
+                    type: string
+                  budget_type:
+                    type: string
+                  budget_status:
+                    type: string
+                  budget_period_start_iso_date:
+                    type: string
+                  budget_period_end_iso_date:
+                    type: string
+                  budget_value:
+                    type: string
+                  budget_value_currency:
+                    type: string
+                  budget_value_value_date:
+                    type: string
+                  planned_disbursement_type:
+                    type: array
+                    items:
+                      type: string
+                  planned_disbursement_period_start_iso_date:
+                    type: array
+                    items:
+                      type: string
+                  planned_disbursement_period_end_iso_date:
+                    type: array
+                    items:
+                      type: string
+                  planned_disbursement_value:
+                    type: array
+                    items:
+                      type: string
+                  planned_disbursement_value_currency:
+                    type: array
+                    items:
+                      type: string
+                  planned_disbursement_value_value_date:
+                    type: array
+                    items:
+                      type: string
+                  planned_disbursement_provider_org_provider_activity_id:
+                    type: string
+                  planned_disbursement_provider_org_type:
+                    type: string
+                  planned_disbursement_provider_org_ref:
+                    type: string
+                  planned_disbursement_provider_org_narrative:
+                    type: string
+                  planned_disbursement_receiver_org_receiver_activity_id:
+                    type: string
+                  planned_disbursement_receiver_org_type:
+                    type: string
+                  planned_disbursement_receiver_org_ref:
+                    type: string
+                  planned_disbursement_receiver_org_narrative:
+                    type: string
+                  capital_spend_percentage:
+                    type: string
+                  transaction_ref:
+                    type: string
+                  transaction_humanitarian:
+                    type: string
+                  transaction_transaction_type_code:
+                    type: string
+                  transaction_transaction_date_iso_date:
+                    type: string
+                  transaction_value:
+                    type: string
+                  transaction_value_currency:
+                    type: string
+                  transaction_value_value_date:
+                    type: string
+                  transaction_description_narrative:
+                    type: string
+                  transaction_provider_org_provider_activity_id:
+                    type: string
+                  transaction_provider_org_type:
+                    type: string
+                  transaction_provider_org_ref:
+                    type: string
+                  transaction_provider_org_narrative:
+                    type: string
+                  transaction_receiver_org_receiver_activity_id:
+                    type: string
+                  transaction_receiver_org_type:
+                    type: string
+                  transaction_receiver_org_ref:
+                    type: string
+                  transaction_receiver_org_narrative:
+                    type: string
+                  transaction_disbursement_channel_code:
+                    type: string
+                  transaction_flow_type_code:
+                    type: string
+                  transaction_finance_type_code:
+                    type: string
+                  transaction_aid_type_code:
+                    type: array
+                    items:
+                      type: string
+                  transaction_aid_type_vocabulary:
+                    type: array
+                    items:
+                      type: string
+                  transaction_tied_status_code:
+                    type: string
+                  document_link_format:
+                    type: string
+                  document_link_url:
+                    type: string
+                  document_link_title_narrative:
+                    type: array
+                    items:
+                      type: string
+                  document_link_title_narrative_xml_lang:
+                    type: array
+                    items:
+                      type: string
+                  document_link_description_narrative:
+                    type: string
+                  document_link_category_code:
+                    type: string
+                  document_link_language_code:
+                    type: string
+                  document_link_document_date_iso_date:
+                    type: string
+                  related_activity_ref:
+                    type: string
+                  related_activity_type:
+                    type: string
+                  legacy_data_name:
+                    type: array
+                    items:
+                      type: string
+                  legacy_data_value:
+                    type: array
+                    items:
+                      type: string
+                  legacy_data_iati_equivalent:
+                    type: array
+                    items:
+                      type: string
+                  conditions_attached:
+                    type: string
+                  conditions_condition_type:
+                    type: string
+                  conditions_condition_narrative:
+                    type: array
+                    items:
+                      type: string
+                  conditions_condition_narrative_xml_lang:
+                    type: array
+                    items:
+                      type: string
+                  result_type:
+                    type: string
+                  result_aggregation_status:
+                    type: string
+                  result_title_narrative:
+                    type: string
+                  result_description_narrative:
+                    type: string
+                  result_document_link_format:
+                    type: string
+                  result_document_link_url:
+                    type: string
+                  result_document_link_title_narrative:
+                    type: string
+                  result_document_link_description_narrative:
+                    type: string
+                  result_document_link_category_code:
+                    type: string
+                  result_document_link_language_code:
+                    type: string
+                  result_document_link_document_date_iso_date:
+                    type: string
+                  result_indicator_measure:
+                    type: string
+                  result_indicator_ascending:
+                    type: string
+                  result_indicator_aggregation_status:
+                    type: string
+                  result_indicator_title_narrative:
+                    type: string
+                  result_indicator_description_narrative:
+                    type: string
+                  result_indicator_document_link_format:
+                    type: string
+                  result_indicator_document_link_url:
+                    type: string
+                  result_indicator_document_link_title_narrative:
+                    type: string
+                  result_indicator_document_link_description_narrative:
+                    type: string
+                  result_indicator_document_link_category_code:
+                    type: string
+                  result_indicator_document_link_language_code:
+                    type: string
+                  result_indicator_document_link_document_date_iso_date:
+                    type: string
+                  result_indicator_reference_vocabulary:
+                    type: array
+                    items:
+                      type: string
+                  result_indicator_reference_code:
+                    type: array
+                    items:
+                      type: string
+                  result_indicator_reference_indicator_uri:
+                    type: array
+                    items:
+                      type: string
+                  result_indicator_baseline_year:
+                    type: string
+                  result_indicator_baseline_iso_date:
+                    type: string
+                  result_indicator_baseline_value:
+                    type: string
+                  result_indicator_baseline_location_ref:
+                    type: array
+                    items:
+                      type: string
+                  result_indicator_baseline_dimension_name:
+                    type: array
+                    items:
+                      type: string
+                  result_indicator_baseline_dimension_value:
+                    type: array
+                    items:
+                      type: string
+                  result_indicator_baseline_document_link_format:
+                    type: string
+                  result_indicator_baseline_document_link_url:
+                    type: string
+                  result_indicator_baseline_document_link_title_narrative:
+                    type: string
+                  result_indicator_baseline_document_link_description_narrative:
+                    type: string
+                  result_indicator_baseline_document_link_category_code:
+                    type: string
+                  result_indicator_baseline_document_link_language_code:
+                    type: string
+                  result_indicator_baseline_document_link_document_date_iso_date:
+                    type: string
+                  result_indicator_baseline_comment_narrative:
+                    type: string
+                  result_indicator_period_period_start_iso_date:
+                    type: string
+                  result_indicator_period_period_end_iso_date:
+                    type: string
+                  result_indicator_period_target_value:
+                    type: string
+                  result_indicator_period_target_location_ref:
+                    type: array
+                    items:
+                      type: string
+                  result_indicator_period_target_dimension_name:
+                    type: array
+                    items:
+                      type: string
+                  result_indicator_period_target_dimension_value:
+                    type: array
+                    items:
+                      type: string
+                  result_indicator_period_target_comment_narrative:
+                    type: string
+                  result_indicator_period_target_document_link_format:
+                    type: string
+                  result_indicator_period_target_document_link_url:
+                    type: string
+                  result_indicator_period_target_document_link_title_narrative:
+                    type: string
+                  result_indicator_period_target_document_link_description_narrative:
+                    type: string
+                  result_indicator_period_target_document_link_category_code:
+                    type: string
+                  result_indicator_period_target_document_link_language_code:
+                    type: string
+                  result_indicator_period_target_document_link_document_date_iso_date:
+                    type: string
+                  result_indicator_period_actual_value:
+                    type: string
+                  result_indicator_period_actual_location_ref:
+                    type: array
+                    items:
+                      type: string
+                  result_indicator_period_actual_dimension_name:
+                    type: array
+                    items:
+                      type: string
+                  result_indicator_period_actual_dimension_value:
+                    type: array
+                    items:
+                      type: string
+                  result_indicator_period_actual_comment_narrative:
+                    type: string
+                  result_indicator_period_actual_document_link_format:
+                    type: string
+                  result_indicator_period_actual_document_link_url:
+                    type: string
+                  result_indicator_period_actual_document_link_title_narrative:
+                    type: string
+                  result_indicator_period_actual_document_link_description_narrative:
+                    type: string
+                  result_indicator_period_actual_document_link_category_code:
+                    type: string
+                  result_indicator_period_actual_document_link_language_code:
+                    type: string
+                  result_indicator_period_actual_document_link_document_date_iso_date:
+                    type: string
+                  crs_add_other_flags_code:
+                    type: string
+                  crs_add_other_flags_significance:
+                    type: string
+                  crs_add_loan_terms_rate_1:
+                    type: string
+                  crs_add_loan_terms_rate_2:
+                    type: string
+                  crs_add_loan_terms_repayment_type_code:
+                    type: string
+                  crs_add_loan_terms_repayment_plan_code:
+                    type: string
+                  crs_add_loan_terms_commitment_date_iso_date:
+                    type: string
+                  crs_add_loan_terms_repayment_first_date_iso_date:
+                    type: string
+                  crs_add_loan_terms_repayment_final_date_iso_date:
+                    type: string
+                  crs_add_loan_status_year:
+                    type: string
+                  crs_add_loan_status_currency:
+                    type: string
+                  crs_add_loan_status_value_date:
+                    type: string
+                  crs_add_loan_status_interest_received:
+                    type: string
+                  crs_add_loan_status_principal_outstanding:
+                    type: string
+                  crs_add_loan_status_principal_arrears:
+                    type: string
+                  crs_add_loan_status_interest_arrears:
+                    type: string
+                  crs_add_channel_code:
+                    type: string
+                  fss_extraction_date:
+                    type: string
+                  fss_priority:
+                    type: string
+                  fss_phaseout_year:
+                    type: string
+                  fss_forecast:
+                    type: string
+                  fss_forecast_year:
+                    type: string
+                  fss_forecast_value_date:
+                    type: string
+                  fss_forecast_currency:
+                    type: string
+      example:
+        responseHeader:
+          zkConnected: false
+          status: 0
+          QTime: 0
+          params:
+            q: string
+            start: string
+            rows: string
+            wt: string
+        response:
+          numFound: 0
+          start: 0
+          numFoundExact: false
+          docs:
+            - dataset_version: string
+              dataset_linked_data_default: string
+              dataset_generated_datetime: string
+              xml_lang: string
+              default_currency: string
+              last_updated_datetime: string
+              humanitarian: string
+              linked_data_uri: string
+              hierarchy: string
+              budget_not_provided: string
+              iati_identifier: string
+              reporting_org_ref: string
+              reporting_org_type: string
+              reporting_org_secondary_reporter: string
+              reporting_org_narrative:
+                - string
+              reporting_org_narrative_xml_lang:
+                - string
+              title_narrative:
+                - string
+              title_narrative_xml_lang:
+                - string
+              description_type:
+                - string
+              description_narrative:
+                - string
+              description_narrative_xml_lang:
+                - string
+              participating_org_ref:
+                - string
+              participating_org_role:
+                - string
+              participating_org_type:
+                - string
+              participating_org_activity_id:
+                - string
+              participating_org_crs_channel_code:
+                - string
+              participating_org_narrative:
+                - string
+              participating_org_narrative_xml_lang:
+                - string
+              other_identifier_ref: string
+              other_identifier_type: string
+              other_identifier_owner_org_ref: string
+              other_identifier_owner_org_narrative: string
+              activity_status_code: string
+              activity_date_iso_date:
+                - string
+              activity_date_type:
+                - string
+              activity_date_narrative:
+                - string
+              activity_date_narrative_xml_lang:
+                - string
+              contact_info_type: string
+              contact_info_organisation_narrative: string
+              contact_info_department_narrative: string
+              contact_info_person_name_narrative: string
+              contact_info_job_title_narrative: string
+              contact_info_telephone: string
+              contact_info_email: string
+              contact_info_website: string
+              contact_info_mailing_address_narrative: string
+              activity_scope_code: string
+              recipient_country_code:
+                - string
+              recipient_country_percentage:
+                - string
+              recipient_region_code:
+                - string
+              recipient_region_vocabulary:
+                - string
+              recipient_region_percentage:
+                - string
+              recipient_region_vocabulary_uri:
+                - string
+              location_ref:
+                - string
+              location_location_reach_code:
+                - string
+              location_location_id_vocabulary:
+                - string
+              location_location_id_code:
+                - string
+              location_name_narrative:
+                - string
+              location_description_narrative:
+                - string
+              location_activity_description_narrative:
+                - string
+              location_administrative_vocabulary:
+                - string
+              location_administrative_level:
+                - string
+              location_administrative_code:
+                - string
+              location_point_srsName:
+                - string
+              location_point_pos:
+                - string
+              location_exactness_code:
+                - string
+              location_location_class_code:
+                - string
+              location_feature_designation_code:
+                - string
+              sector_vocabulary:
+                - string
+              sector_code:
+                - string
+              sector_percentage:
+                - string
+              sector_vocabulary_uri:
+                - string
+              sector_narrative: string
+              tag_vocabulary:
+                - string
+              tag_code:
+                - string
+              tag_vocabulary_uri:
+                - string
+              tag_narrative:
+                - string
+              country_budget_items_vocabulary: string
+              country_budget_items_budget_item_code:
+                - string
+              country_budget_items_budget_item_percentage:
+                - string
+              country_budget_items_budget_item_description_narrative:
+                - string
+              humanitarian_scope_type:
+                - string
+              humanitarian_scope_vocabulary:
+                - string
+              humanitarian_scope_code:
+                - string
+              humanitarian_scope_vocabulary_uri:
+                - string
+              humanitarian_scope_narrative:
+                - string
+              humanitarian_scope_narrative_xml_lang:
+                - string
+              policy_marker_vocabulary:
+                - string
+              policy_marker_code:
+                - string
+              policy_marker_significance:
+                - string
+              policy_marker_vocabulary_uri:
+                - string
+              policy_marker_narrative: string
+              collaboration_type_code: string
+              default_flow_type_code: string
+              default_finance_type_code: string
+              default_aid_type_code:
+                - string
+              default_aid_type_vocabulary:
+                - string
+              default_tied_status_code: string
+              budget_type: string
+              budget_status: string
+              budget_period_start_iso_date: string
+              budget_period_end_iso_date: string
+              budget_value: string
+              budget_value_currency: string
+              budget_value_value_date: string
+              planned_disbursement_type:
+                - string
+              planned_disbursement_period_start_iso_date:
+                - string
+              planned_disbursement_period_end_iso_date:
+                - string
+              planned_disbursement_value:
+                - string
+              planned_disbursement_value_currency:
+                - string
+              planned_disbursement_value_value_date:
+                - string
+              planned_disbursement_provider_org_provider_activity_id: string
+              planned_disbursement_provider_org_type: string
+              planned_disbursement_provider_org_ref: string
+              planned_disbursement_provider_org_narrative: string
+              planned_disbursement_receiver_org_receiver_activity_id: string
+              planned_disbursement_receiver_org_type: string
+              planned_disbursement_receiver_org_ref: string
+              planned_disbursement_receiver_org_narrative: string
+              capital_spend_percentage: string
+              transaction_ref: string
+              transaction_humanitarian: string
+              transaction_transaction_type_code: string
+              transaction_transaction_date_iso_date: string
+              transaction_value: string
+              transaction_value_currency: string
+              transaction_value_value_date: string
+              transaction_description_narrative: string
+              transaction_provider_org_provider_activity_id: string
+              transaction_provider_org_type: string
+              transaction_provider_org_ref: string
+              transaction_provider_org_narrative: string
+              transaction_receiver_org_receiver_activity_id: string
+              transaction_receiver_org_type: string
+              transaction_receiver_org_ref: string
+              transaction_receiver_org_narrative: string
+              transaction_disbursement_channel_code: string
+              transaction_flow_type_code: string
+              transaction_finance_type_code: string
+              transaction_aid_type_code:
+                - string
+              transaction_aid_type_vocabulary:
+                - string
+              transaction_tied_status_code: string
+              document_link_format: string
+              document_link_url: string
+              document_link_title_narrative:
+                - string
+              document_link_title_narrative_xml_lang:
+                - string
+              document_link_description_narrative: string
+              document_link_category_code: string
+              document_link_language_code: string
+              document_link_document_date_iso_date: string
+              related_activity_ref: string
+              related_activity_type: string
+              legacy_data_name:
+                - string
+              legacy_data_value:
+                - string
+              legacy_data_iati_equivalent:
+                - string
+              conditions_attached: string
+              conditions_condition_type: string
+              conditions_condition_narrative:
+                - string
+              conditions_condition_narrative_xml_lang:
+                - string
+              result_type: string
+              result_aggregation_status: string
+              result_title_narrative: string
+              result_description_narrative: string
+              result_document_link_format: string
+              result_document_link_url: string
+              result_document_link_title_narrative: string
+              result_document_link_description_narrative: string
+              result_document_link_category_code: string
+              result_document_link_language_code: string
+              result_document_link_document_date_iso_date: string
+              result_indicator_measure: string
+              result_indicator_ascending: string
+              result_indicator_aggregation_status: string
+              result_indicator_title_narrative: string
+              result_indicator_description_narrative: string
+              result_indicator_document_link_format: string
+              result_indicator_document_link_url: string
+              result_indicator_document_link_title_narrative: string
+              result_indicator_document_link_description_narrative: string
+              result_indicator_document_link_category_code: string
+              result_indicator_document_link_language_code: string
+              result_indicator_document_link_document_date_iso_date: string
+              result_indicator_reference_vocabulary:
+                - string
+              result_indicator_reference_code:
+                - string
+              result_indicator_reference_indicator_uri:
+                - string
+              result_indicator_baseline_year: string
+              result_indicator_baseline_iso_date: string
+              result_indicator_baseline_value: string
+              result_indicator_baseline_location_ref:
+                - string
+              result_indicator_baseline_dimension_name:
+                - string
+              result_indicator_baseline_dimension_value:
+                - string
+              result_indicator_baseline_document_link_format: string
+              result_indicator_baseline_document_link_url: string
+              result_indicator_baseline_document_link_title_narrative: string
+              result_indicator_baseline_document_link_description_narrative: string
+              result_indicator_baseline_document_link_category_code: string
+              result_indicator_baseline_document_link_language_code: string
+              result_indicator_baseline_document_link_document_date_iso_date: string
+              result_indicator_baseline_comment_narrative: string
+              result_indicator_period_period_start_iso_date: string
+              result_indicator_period_period_end_iso_date: string
+              result_indicator_period_target_value: string
+              result_indicator_period_target_location_ref:
+                - string
+              result_indicator_period_target_dimension_name:
+                - string
+              result_indicator_period_target_dimension_value:
+                - string
+              result_indicator_period_target_comment_narrative: string
+              result_indicator_period_target_document_link_format: string
+              result_indicator_period_target_document_link_url: string
+              result_indicator_period_target_document_link_title_narrative: string
+              result_indicator_period_target_document_link_description_narrative: string
+              result_indicator_period_target_document_link_category_code: string
+              result_indicator_period_target_document_link_language_code: string
+              result_indicator_period_target_document_link_document_date_iso_date: string
+              result_indicator_period_actual_value: string
+              result_indicator_period_actual_location_ref:
+                - string
+              result_indicator_period_actual_dimension_name:
+                - string
+              result_indicator_period_actual_dimension_value:
+                - string
+              result_indicator_period_actual_comment_narrative: string
+              result_indicator_period_actual_document_link_format: string
+              result_indicator_period_actual_document_link_url: string
+              result_indicator_period_actual_document_link_title_narrative: string
+              result_indicator_period_actual_document_link_description_narrative: string
+              result_indicator_period_actual_document_link_category_code: string
+              result_indicator_period_actual_document_link_language_code: string
+              result_indicator_period_actual_document_link_document_date_iso_date: string
+              crs_add_other_flags_code: string
+              crs_add_other_flags_significance: string
+              crs_add_loan_terms_rate_1: string
+              crs_add_loan_terms_rate_2: string
+              crs_add_loan_terms_repayment_type_code: string
+              crs_add_loan_terms_repayment_plan_code: string
+              crs_add_loan_terms_commitment_date_iso_date: string
+              crs_add_loan_terms_repayment_first_date_iso_date: string
+              crs_add_loan_terms_repayment_final_date_iso_date: string
+              crs_add_loan_status_year: string
+              crs_add_loan_status_currency: string
+              crs_add_loan_status_value_date: string
+              crs_add_loan_status_interest_received: string
+              crs_add_loan_status_principal_outstanding: string
+              crs_add_loan_status_principal_arrears: string
+              crs_add_loan_status_interest_arrears: string
+              crs_add_channel_code: string
+              fss_extraction_date: string
+              fss_priority: string
+              fss_phaseout_year: string
+              fss_forecast: string
+              fss_forecast_year: string
+              fss_forecast_value_date: string
+              fss_forecast_currency: string
+      x-apim-schema-name: Query Response All IATI Fields
+    Invalid_Query_Parameter_Response__400_:
+      type: object
+      properties:
+        responseHeader:
+          type: object
+          properties:
+            zkConnected:
+              type: boolean
+            status:
+              type: integer
+            QTime:
+              type: integer
+            params:
+              type: object
+              properties:
+                sort:
+                  type: string
+                rows:
+                  type: string
+        error:
+          type: object
+          properties:
+            metadata:
+              type: array
+              items:
+                type: string
+            msg:
+              type: string
+            code:
+              type: integer
+      x-apim-schema-name: Invalid Query Parameter Response (400)
+    Identifier_Existence_-_Request_:
+      type: object
+      properties:
+        iati_identifiers:
+          type: array
+          items:
+            type: string
+      example:
+        iati_identifiers:
+          - AA-AAA-GOV-0123456
+          - AA-AAB-GOV-7890123
+      x-apim-schema-name: 'Identifier Existence - Request '
+    Identifier_Existence_-_200_Response:
+      type: object
+      properties:
+        message:
+          type: string
+        detail:
+          type: string
+        unique_iati_identifiers_found:
+          type: integer
+        total_iati_identifier_occurrences:
+          type: integer
+        num_iati_identifiers_not_found:
+          type: integer
+        iati_identifiers_found:
+          type: object
+          properties:
+            FOUND_IATI_IDENTIFIER:
+              type: object
+              properties:
+                count:
+                  type: integer
+        iati_identifiers_not_found:
+          type: object
+          properties:
+            NOT_FOUND_IATI_IDENTIFIER:
+              type: object
+      example:
+        message: string
+        detail: string
+        unique_iati_identifiers_found: 0
+        total_iati_identifier_occurrences: 0
+        num_iati_identifiers_not_found: 0
+        iati_identifiers_found:
+          FOUND_IATI_IDENTIFIER:
+            count: 0
+        iati_identifiers_not_found:
+          NOT_FOUND_IATI_IDENTIFIER: { }
+      x-apim-schema-name: Identifier Existence - 200 Response
+  securitySchemes:
+    apiKeyHeader:
+      type: apiKey
+      name: Ocp-Apim-Subscription-Key
+      in: header
+    apiKeyQuery:
+      type: apiKey
+      name: subscription-key
+      in: query
+security:
+  - apiKeyHeader: [ ]
+  - apiKeyQuery: [ ]
