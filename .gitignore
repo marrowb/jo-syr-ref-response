@@ -1,1 +1,4 @@
 .idea
+.env
+.aider*
+__pycache__/
