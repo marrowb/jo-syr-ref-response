@@ -1,3 +1,4 @@
+from definitions import SECTOR_JSON_PATH
 import dspy
 from typing import List, Literal
 import random
@@ -24,10 +25,6 @@ class IATIClassifier(dspy.Signature):
     
     llm_geographic_focus: List[str] = dspy.OutputField(
         desc="""To list specific sub-national administrative areas, cities, or regions within the host country (e.g., Jordan) that are explicitly mentioned in the narrative as locations for project activities. Extracted names of locations (e.g., "Amman", "Zarka", "Irbid", "Mafraq governorate", "northern Jordan"). The value "national" can be used if the project is explicitly described as having a nationwide scope. If only the country name (e.g., "Jordan") is mentioned without further sub-national detail, and the scope isn't explicitly "national", then the country name can be used. If no specific sub-national locations, "national" scope, or country-level mention is present, this field should be an empty list []."""
-    )
-    
-    llm_sector: List[str] = dspy.OutputField(
-        desc="""To assign the LLM's best guess of relevant IATI sector codes based on the project's description in the narrative. The LLM must use the provided Sector.json file as the authoritative source for IATI 5-digit sector codes and their definitions. Valid IATI 5-digit sector codes found in the provided Sector.json file. If a relevant sector cannot be reasonably and confidently inferred from the narrative by matching to definitions in Sector.json, this field should be an empty list []."""
     )
     
     llm_nexus: List[Literal["humanitarian", "development"]] = dspy.OutputField(
@@ -59,6 +56,11 @@ def smart_sample(activities: List[dict], n: int = 100) -> List[dict]:
     
     return sample
 
+def build_sector_string():
+    sector_data = read_json(SECTOR_JSON_PATH)
+    sector_text = ""
+    for sector in sector_data.get('data')
+
 def generate_labels(activities: List[dict], model: str) -> List[dict]:
     """Generate initial labels using strong model."""
     lm = dspy.LM(model)
@@ -80,12 +82,12 @@ def generate_labels(activities: List[dict], model: str) -> List[dict]:
                     'llm_target_population': result.llm_target_population,
                     'llm_ref_setting': result.llm_ref_setting,
                     'llm_geographic_focus': result.llm_geographic_focus,
-                    'llm_sector': result.llm_sector,
                     'llm_nexus': result.llm_nexus,
                     'llm_funding_org': result.llm_funding_org,
                     'llm_implementing_org': result.llm_implementing_org
                 })
                 labeled.append(activity_copy)
+                break
             except Exception as e:
                 print(f"Error: {e}")
                 continue
@@ -98,7 +100,7 @@ def simple_metric(example, prediction, trace=None) -> float:
     total_fields = 0
     
     fields = ['llm_ref_group', 'llm_target_population', 'llm_ref_setting', 
-              'llm_geographic_focus', 'llm_sector', 'llm_nexus', 
+              'llm_geographic_focus', 'llm_nexus', 
               'llm_funding_org', 'llm_implementing_org']
     
     for field in fields:
@@ -135,7 +137,6 @@ def prepare_examples(activities: List[dict]) -> List[dspy.Example]:
             llm_target_population=activity.get('llm_target_population', []),
             llm_ref_setting=activity.get('llm_ref_setting', []),
             llm_geographic_focus=activity.get('llm_geographic_focus', []),
-            llm_sector=activity.get('llm_sector', []),
             llm_nexus=activity.get('llm_nexus', []),
             llm_funding_org=activity.get('llm_funding_org', []),
             llm_implementing_org=activity.get('llm_implementing_org', [])
