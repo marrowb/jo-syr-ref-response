@@ -8,8 +8,8 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # DSPy Configuration
 DSPY_CONFIG = {
-    "strong_model": "openai/gpt-4o",
-    "task_model": "openai/gpt-4o-mini", 
+    "strong_model": "gemini/gemini-2.5-pro-preview-05-06",
+    "task_model": "gemini/gemini-2.0-flash", 
     "sample_size": 100,
     "train_test_split": 0.8
 }
