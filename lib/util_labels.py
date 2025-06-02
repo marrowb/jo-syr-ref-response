@@ -51,60 +51,117 @@ class LabelValidator:
         print("="*80)
         
         print(f"\n📋 TITLE:")
-        print(f"   {activity.get('title_narrative', 'N/A')}")
+        title = activity.get('title_narrative', ['N/A'])
+        if isinstance(title, list):
+            title = title[0] if title else 'N/A'
+        print(f"   {title}")
         
         print(f"\n📝 DESCRIPTION:")
-        desc = activity.get('description_narrative', 'N/A')
-        if len(desc) > 300:
+        desc = activity.get('description_narrative', ['N/A'])
+        if isinstance(desc, list):
+            desc = desc[0] if desc else 'N/A'
+        if isinstance(desc, str) and len(desc) > 300:
             print(f"   {desc[:300]}...")
         else:
             print(f"   {desc}")
         
-        print(f"\n🏷️  SECTOR NARRATIVE:")
-        print(f"   {activity.get('sector_narrative', 'N/A')}")
+        print(f"\n🏷️  SECTOR:")
+        sector = activity.get('sector_narrative', ['N/A'])
+        if isinstance(sector, list):
+            sector = sector[0] if sector else 'N/A'
+        print(f"   {sector}")
         
         print(f"\n🤖 CURRENT LABELS:")
         for i, field in enumerate(self.label_fields, 1):
             value = activity.get(field, [])
             valid = "✅" if self.validate_field(field, value) else "❌"
-            print(f"   {i}. {field}: {value} {valid}")
+            display_name = field.replace('llm_', '').replace('_', ' ').title()
+            value_display = ', '.join(value) if value else '(empty)'
+            print(f"   {i}. {display_name:20} {value_display} {valid}")
     
     def edit_field(self, current_value: List, field_name: str) -> List:
-        """Interactive editing of a field value."""
-        print(f"\nEditing {field_name}")
-        print(f"Current value: {current_value}")
+        """Interactive editing of a field value with user-friendly input."""
+        print(f"\n🔧 Editing {field_name.replace('llm_', '').replace('_', ' ').title()}")
+        print(f"📋 Current: {', '.join(current_value) if current_value else '(empty)'}")
         
-        if field_name == 'llm_ref_group':
-            print(f"Valid options: {self.valid_ref_groups}")
-        elif field_name == 'llm_target_population':
-            print(f"Valid options: {self.valid_target_populations}")
-        elif field_name == 'llm_ref_setting':
-            print(f"Valid options: {self.valid_settings}")
-        elif field_name == 'llm_nexus':
-            print(f"Valid options: {self.valid_nexus}")
+        # Handle constrained fields with interactive selection
+        if field_name in ['llm_ref_group', 'llm_target_population', 'llm_ref_setting', 'llm_nexus']:
+            return self._edit_constrained_field(current_value, field_name)
+        else:
+            return self._edit_free_text_field(current_value, field_name)
+    
+    def _edit_constrained_field(self, current_value: List, field_name: str) -> List:
+        """Edit fields with predefined valid options."""
+        valid_options = {
+            'llm_ref_group': self.valid_ref_groups,
+            'llm_target_population': self.valid_target_populations,
+            'llm_ref_setting': self.valid_settings,
+            'llm_nexus': self.valid_nexus
+        }
         
-        print("Enter new value as JSON list (e.g., [\"Syria\", \"Iraq\"]) or press Enter to keep current:")
-        new_input = input("> ").strip()
+        options = valid_options[field_name]
         
-        if not new_input:
+        print(f"\n📝 Available options:")
+        for i, option in enumerate(options, 1):
+            selected = "✓" if option in current_value else " "
+            print(f"   {i:2d}. [{selected}] {option}")
+        
+        print(f"\n💡 Instructions:")
+        print(f"   • Enter numbers (e.g., '1 3 5') to select multiple options")
+        print(f"   • Enter 'clear' to remove all selections")
+        print(f"   • Press Enter to keep current selection")
+        
+        user_input = input("👉 Your choice: ").strip()
+        
+        if not user_input:
             return current_value
+        
+        if user_input.lower() == 'clear':
+            print("✅ Cleared all selections")
+            return []
         
         try:
-            new_value = json.loads(new_input)
-            if not isinstance(new_value, list):
-                print("❌ Error: Value must be a list")
-                return current_value
+            # Parse number selections
+            selected_indices = [int(x.strip()) - 1 for x in user_input.split()]
+            new_value = []
             
-            if not self.validate_field(field_name, new_value):
-                print("❌ Error: Invalid values for this field")
-                return current_value
+            for idx in selected_indices:
+                if 0 <= idx < len(options):
+                    new_value.append(options[idx])
+                else:
+                    print(f"⚠️  Warning: Ignoring invalid option number {idx + 1}")
             
-            print(f"✅ Updated to: {new_value}")
+            # Remove duplicates while preserving order
+            new_value = list(dict.fromkeys(new_value))
+            
+            print(f"✅ Updated to: {', '.join(new_value) if new_value else '(empty)'}")
             return new_value
             
-        except json.JSONDecodeError:
-            print("❌ Error: Invalid JSON format")
+        except ValueError:
+            print("❌ Error: Please enter valid numbers separated by spaces")
             return current_value
+    
+    def _edit_free_text_field(self, current_value: List, field_name: str) -> List:
+        """Edit free-text fields like geographic focus, organizations."""
+        print(f"\n💡 Instructions:")
+        print(f"   • Enter values separated by commas (e.g., 'Jordan, Amman, Zarqa')")
+        print(f"   • Enter 'clear' to remove all values")
+        print(f"   • Press Enter to keep current values")
+        
+        user_input = input("👉 Enter values: ").strip()
+        
+        if not user_input:
+            return current_value
+        
+        if user_input.lower() == 'clear':
+            print("✅ Cleared all values")
+            return []
+        
+        # Split by comma and clean up
+        new_value = [item.strip() for item in user_input.split(',') if item.strip()]
+        
+        print(f"✅ Updated to: {', '.join(new_value) if new_value else '(empty)'}")
+        return new_value
     
     def review_activities(self, input_file: str, output_file: str = None):
         """Main review loop for activities."""
@@ -123,13 +180,15 @@ class LabelValidator:
         
         print(f"🚀 Starting review of {len(activities)} activities")
         print(f"📁 Will save corrected labels to: {output_file}")
-        print("\nCommands:")
-        print("  Enter = Next activity")
-        print("  e = Edit current activity")
-        print("  b = Go back to previous activity")
-        print("  j <number> = Jump to activity number")
-        print("  s = Save and continue")
-        print("  q = Save and quit")
+        print("\n🎮 COMMANDS:")
+        print("  Enter/n     = Next activity")
+        print("  e           = Edit current activity")
+        print("  b           = Go back to previous activity")
+        print("  j <number>  = Jump to activity number")
+        print("  f <field>   = Quick edit field (e.g., 'f 1' for ref group)")
+        print("  s           = Save and continue")
+        print("  q           = Save and quit")
+        print("  h           = Show this help")
         
         current_index = 0
         
@@ -146,6 +205,32 @@ class LabelValidator:
             elif command == 'e':
                 # Edit current activity
                 self.edit_activity(activity)
+                
+            elif command.startswith('f '):
+                # Quick edit single field
+                try:
+                    field_num = int(command.split()[1]) - 1
+                    if 0 <= field_num < len(self.label_fields):
+                        field_name = self.label_fields[field_num]
+                        current_value = activity.get(field_name, [])
+                        new_value = self.edit_field(current_value, field_name)
+                        activity[field_name] = new_value
+                    else:
+                        print(f"❌ Invalid field number. Range: 1-{len(self.label_fields)}")
+                except (ValueError, IndexError):
+                    print("❌ Invalid field command. Use: f <number>")
+                    
+            elif command == 'h':
+                # Show help
+                print("\n🎮 COMMANDS:")
+                print("  Enter/n     = Next activity")
+                print("  e           = Edit current activity")
+                print("  b           = Go back to previous activity")
+                print("  j <number>  = Jump to activity number")
+                print("  f <field>   = Quick edit field (e.g., 'f 1' for ref group)")
+                print("  s           = Save and continue")
+                print("  q           = Save and quit")
+                print("  h           = Show this help")
                 
             elif command == 'b':
                 # Previous activity
@@ -187,30 +272,41 @@ class LabelValidator:
     def edit_activity(self, activity: Dict):
         """Edit all fields of an activity."""
         print("\n🔧 EDITING MODE")
-        print("Select field to edit (or 'done' to finish):")
         
         while True:
+            print("\n📝 Current labels:")
             for i, field in enumerate(self.label_fields, 1):
                 value = activity.get(field, [])
                 valid = "✅" if self.validate_field(field, value) else "❌"
-                print(f"   {i}. {field}: {value} {valid}")
+                display_name = field.replace('llm_', '').replace('_', ' ').title()
+                value_display = ', '.join(value) if value else '(empty)'
+                print(f"   {i}. {display_name:20} {value_display} {valid}")
             
-            choice = input("\nEnter field number (1-7) or 'done': ").strip()
+            print(f"\n💡 Enter field number (1-{len(self.label_fields)}), 'all' to edit all invalid fields, or 'done' to finish:")
+            choice = input("👉 Your choice: ").strip()
             
             if choice.lower() == 'done':
                 break
-                
-            try:
-                field_index = int(choice) - 1
-                if 0 <= field_index < len(self.label_fields):
-                    field_name = self.label_fields[field_index]
-                    current_value = activity.get(field_name, [])
-                    new_value = self.edit_field(current_value, field_name)
-                    activity[field_name] = new_value
-                else:
-                    print("❌ Invalid field number")
-            except ValueError:
-                print("❌ Invalid input")
+            elif choice.lower() == 'all':
+                # Edit all invalid fields
+                for field in self.label_fields:
+                    value = activity.get(field, [])
+                    if not self.validate_field(field, value):
+                        print(f"\n🔧 Auto-editing invalid field: {field}")
+                        new_value = self.edit_field(value, field)
+                        activity[field] = new_value
+            else:
+                try:
+                    field_index = int(choice) - 1
+                    if 0 <= field_index < len(self.label_fields):
+                        field_name = self.label_fields[field_index]
+                        current_value = activity.get(field_name, [])
+                        new_value = self.edit_field(current_value, field_name)
+                        activity[field_name] = new_value
+                    else:
+                        print(f"❌ Invalid field number. Range: 1-{len(self.label_fields)}")
+                except ValueError:
+                    print("❌ Invalid input. Enter a number, 'all', or 'done'")
 
 
 def validate_labels_file(input_file: str):
