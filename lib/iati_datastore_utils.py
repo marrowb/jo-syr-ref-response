@@ -1,8 +1,8 @@
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 import requests
-from typing import Optional, Dict, Any, Tuple, Union, List
+
 from definitions import IATI_API_KEY
-
-
 
 BASE_URL = "https://api.iatistandard.org/datastore"
 ENDPOINTS = {
