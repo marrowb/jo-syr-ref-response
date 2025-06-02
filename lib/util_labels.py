@@ -77,7 +77,21 @@ class LabelValidator:
             valid = "✅" if self.validate_field(field, value) else "❌"
             display_name = field.replace('llm_', '').replace('_', ' ').title()
             value_display = ', '.join(value) if value else '(empty)'
-            print(f"   {i}. {display_name:20} {value_display} {valid}")
+            
+            # Get available options for constrained fields
+            options_display = ""
+            if field == 'llm_ref_group':
+                options_display = f"  │ Options: {', '.join(self.valid_ref_groups)}"
+            elif field == 'llm_target_population':
+                options_display = f"  │ Options: {', '.join(self.valid_target_populations)}"
+            elif field == 'llm_ref_setting':
+                options_display = f"  │ Options: {', '.join(self.valid_settings)}"
+            elif field == 'llm_nexus':
+                options_display = f"  │ Options: {', '.join(self.valid_nexus)}"
+            elif field in ['llm_geographic_focus', 'llm_funding_org', 'llm_implementing_org']:
+                options_display = "  │ Free text (comma-separated)"
+            
+            print(f"   {i}. {display_name:20} {value_display} {valid}{options_display}")
     
     def edit_field(self, current_value: List, field_name: str) -> List:
         """Interactive editing of a field value with user-friendly input."""
@@ -280,7 +294,21 @@ class LabelValidator:
                 valid = "✅" if self.validate_field(field, value) else "❌"
                 display_name = field.replace('llm_', '').replace('_', ' ').title()
                 value_display = ', '.join(value) if value else '(empty)'
-                print(f"   {i}. {display_name:20} {value_display} {valid}")
+                
+                # Get available options for constrained fields
+                options_display = ""
+                if field == 'llm_ref_group':
+                    options_display = f"  │ Options: {', '.join(self.valid_ref_groups)}"
+                elif field == 'llm_target_population':
+                    options_display = f"  │ Options: {', '.join(self.valid_target_populations)}"
+                elif field == 'llm_ref_setting':
+                    options_display = f"  │ Options: {', '.join(self.valid_settings)}"
+                elif field == 'llm_nexus':
+                    options_display = f"  │ Options: {', '.join(self.valid_nexus)}"
+                elif field in ['llm_geographic_focus', 'llm_funding_org', 'llm_implementing_org']:
+                    options_display = "  │ Free text (comma-separated)"
+                
+                print(f"   {i}. {display_name:20} {value_display} {valid}{options_display}")
             
             print(f"\n💡 Enter field number (1-{len(self.label_fields)}), 'all' to edit all invalid fields, or 'done' to finish:")
             choice = input("👉 Your choice: ").strip()
