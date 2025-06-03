@@ -165,59 +165,56 @@ class IATIClassifier(dspy.Signature):
     llm_target_population: List[
         Literal["refugees", "host_communities", "general_population"]
     ] = dspy.OutputField(
-        desc="""CRITICAL: Identify populations that are EXPLICITLY TARGETED as beneficiaries of the aid program. Mere mention is NOT sufficient - the program must be designed to serve these populations.
+        """CRITICAL: Identify populations that are EXPLICITLY and DIRECTLY TARGETED as BENEFICIARIES of the aid program's activities and services. The program must be designed TO SERVE or PROVIDE DIRECT ASSISTANCE TO these populations.
 
-        "refugees": ONLY when the project explicitly states it TARGETS, SERVES, or BENEFITS refugees as primary beneficiaries. Look for:
-        - "targeting refugees", "serving refugee populations", "benefiting refugees"
-        - "refugee beneficiaries", "assistance to refugees", "support for refugees"
-        - Programs specifically designed for refugee needs (livelihood, protection, education for refugees)
-        - Services delivered TO refugees (not just in refugee areas)
-        - Refugees are beneficiaries of the program
-        
+        IMPORTANT DISTINCTION: Do NOT include a population if they are only mentioned as a contextual factor, a reason for the project, or an indirect/potential beneficiary. Focus on who the project's services are DELIVERED TO.
+
+        "refugees": ONLY when the project explicitly states it TARGETS, SERVES, PROVIDES ASSISTANCE TO, or directly BENEFITS refugees as primary beneficiaries.
+        - Examples: "assistance to Syrian refugees", "education services for refugee children", "livelihood support for refugee families".
+        - If a project aims to "improve infrastructure in areas with high refugee populations," this alone does NOT mean "refugees" are the target population unless the infrastructure is specifically FOR refugees or refugees receive distinct access/services. The target might be "host_communities" or "general_population" of that area.
+
         DO NOT use "refugees" if:
-        - Refugees are only mentioned in context or background
-        - Activities happen in refugee areas but don't target refugees specifically
-        - General capacity building that may indirectly affect refugees
+        - Refugees are mentioned as a cause of a problem the project addresses for a broader community. Example: A project description states, "The influx of refugees has strained local water resources. This project will upgrade the municipal water system." Here, the direct beneficiaries are the users of the municipal water system (likely "general_population" or "host_communities"), NOT "refugees," unless refugees are explicitly stated to receive distinct water services from this project.
+        - The project is about general capacity building (e.g., for a government ministry) that might indirectly benefit refugees among others, but does not provide direct services TO refugees.
 
-        "host_communities": ONLY when explicitly targeting local/host populations affected by refugee presence:
-        - "vulnerable Jordanians", "host community members", "local communities hosting refugees"
-        - "communities affected by refugee influx", "vulnerable locals in refugee-hosting areas"
-        - Programs specifically for host community needs/tensions
+        "host_communities": ONLY when the project explicitly targets or provides distinct services to local/host populations specifically because they are affected by or are hosting refugees.
+        - Examples: "support for vulnerable Jordanians in refugee-hosting areas", "services for host community members to mitigate impact of refugee presence".
+        - If a project benefits an entire area that happens to host refugees (e.g., improving a public school for all children in a district), use "general_population" for that district, and add "host_communities" ONLY if host community children/families receive *additional or specific* support beyond the general improvements.
 
-        "general_population": ONLY when targeting broader national population without refugee-specific focus:
-        - "all Jordanians", "national program", "general public", "citizens"
-        - Government capacity building, national systems strengthening
-        - Programs with no refugee/displacement context
+        "general_population": ONLY when the project targets the broader population of an area (national, regional, or local) without a distinct, primary focus on refugees or host communities as separate beneficiary groups receiving differentiated services.
+        - Examples: "national health campaign for all Jordanians", "improving public infrastructure for all residents of Amman".
+        - If a project targets "all residents of Mafraq Governorate," and Mafraq hosts refugees, the target is still "general_population" of Mafraq, unless refugees or host communities within Mafraq are explicitly singled out for different or additional services.
 
-        Multiple values allowed ONLY if program explicitly targets multiple groups. If targeting is unclear or ambiguous, use empty list []. Be conservative - when in doubt, leave empty."""
+        Multiple values are allowed ONLY if the program explicitly states it targets multiple groups with distinct or comprehensive services for each.
+        If targeting is unclear, ambiguous, or if a group is only mentioned contextually (as a driver of the problem rather than a direct recipient of the solution), DO NOT include them. Be very conservative. Focus on WHO RECEIVES the project's outputs/services directly.
+        """
     )
 
-    llm_ref_setting: List[Literal["camp", "urban", "rural"]] = dspy.OutputField(
-        desc="""CRITICAL: Identify the SPECIFIC physical setting where project activities are EXPLICITLY stated to occur. Vague references are not sufficient.
+      llm_ref_setting: List[Literal["camp", "urban", "rural"]] = dspy.OutputField(
+        desc="""CRITICAL: Identify the SPECIFIC physical setting(s) where project activities are EXPLICITLY STATED to take place. Vague references or broad administrative areas (like a governorate) are NOT sufficient unless they are the most specific detail provided and inherently imply a setting (e.g., "agricultural activities in X governorate" implies rural).
 
-        "camp": ONLY when activities explicitly occur in refugee camps:
-        - Named camps: "Za'atari camp", "Azraq camp", "EJC", "Emirati Jordanian Camp"
-        - Clear camp references: "in refugee camps", "camp-based activities", "within the camps"
-        - Camp-specific services: "camp management", "camp facilities", "camp infrastructure"
+        "camp": ONLY when activities explicitly occur IN or are delivered directly TO RECIPIENTS IN refugee camps.
+        - Look for: Named camps ("Za'atari camp", "Azraq camp", "EJC / Emirati Jordanian Camp"), or phrases like "in refugee camps", "camp-based activities", "services within the camps".
+        - If a location like "Azraq" is mentioned, and the activity clearly targets refugees or involves camp-like services, "camp" is appropriate. If "Azraq" refers to the town for general population activities, it would be "urban".
 
-        "urban": ONLY when activities explicitly occur in cities/towns:
-        - Named cities: "Amman", "Irbid", "Zarqa", "Mafraq city", "Aqaba"
-        - Clear urban references: "urban areas", "city centers", "metropolitan areas", "municipal"
-        - Urban-specific context: "city-based services", "urban planning", "downtown"
+        "urban": ONLY when activities explicitly occur in cities, towns, or clearly municipal settings.
+        - Look for: Named cities/towns ("Amman", "Irbid city", "Zarqa town"), or phrases like "urban areas", "city centers", "municipal services".
+        - Distinguish from broader governorates. "Mafraq Governorate" is not "urban" unless activities are specified in "Mafraq city".
 
-        "rural": ONLY when activities explicitly occur in rural/countryside areas:
-        - Clear rural references: "rural areas", "countryside", "villages", "remote areas"
-        - Agricultural context: "farming communities", "agricultural areas", "pastoral regions"
-        - Non-urban geographic: "border villages", "desert communities", "mountainous areas"
+        "rural": ONLY when activities explicitly occur in rural, countryside, agricultural, or non-urban village areas.
+        - Look for: Phrases like "rural areas/communities", "villages", "agricultural lands", "pastoral areas", "desert communities" (if distinct from urban centers).
+        - Example: "Support to farming communities in Balqa Governorate" would imply "rural".
 
-        Multiple values allowed ONLY if activities explicitly span multiple settings (e.g., "activities in both camps and urban areas").
+        Multiple values are allowed ONLY if activities explicitly and clearly span multiple distinct settings (e.g., "services in Azraq camp and Irbid city").
 
         DO NOT infer setting from:
-        - Governorate names alone (e.g., "Mafraq governorate" without specifics)
-        - Organization types (UNHCR doesn't automatically mean camps)
-        - General geographic references ("northern Jordan" without specifics)
+        - Governorate names *alone* if the activity type doesn't inherently imply a setting (e.g., "meetings in Mafraq Governorate" is not specific enough).
+        - Organization types (e.g., UNHCR's presence doesn't automatically mean "camp").
+        - General geographic references like "northern Jordan" if no more specific setting is provided.
 
-        If setting is not explicitly clear, use empty list []. Be conservative."""
+        If the setting is not explicitly stated, is too broad (e.g., just "Jordan" with no further detail for a non-national project), or if a project has a "national" geographic focus without specifying types of settings (e.g. "urban clinics nationwide"), use an empty list []. Be conservative.
+        If a project is described as "nationwide training workshops," and no specific settings like "urban centers" or "rural schools" are mentioned, the setting list should be empty.
+        """
     )
 
     llm_geographic_focus: List[str] = dspy.OutputField(
