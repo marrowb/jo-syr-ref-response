@@ -48,6 +48,7 @@ class LabelValidator:
         self.tracking_fields = [
             "human_edited",
             "notes",
+            "unclear",
         ]
 
     def validate_field(self, field_name: str, value: List) -> bool:
@@ -173,6 +174,10 @@ class LabelValidator:
         edited_status = "✏️ Yes" if human_edited else "🤖 No"
         print(f"   Human Edited: {edited_status}")
         
+        unclear = activity.get("unclear", 0)
+        unclear_status = "❓ Yes" if unclear else "✅ Clear"
+        print(f"   Unclear/Unrelated: {unclear_status}")
+        
         notes = activity.get("notes", "")
         notes_display = notes if notes else "(no notes)"
         if len(notes_display) > 100:
@@ -295,6 +300,7 @@ class LabelValidator:
         print("  j <number>  = Jump to activity number")
         print("  f <field>   = Quick edit field (e.g., 'f 1' for ref group)")
         print("  notes       = Edit notes for this activity")
+        print("  unclear     = Toggle unclear/unrelated flag")
         print("  s           = Save and continue")
         print("  q           = Save and quit")
         print("  h           = Show this help")
@@ -349,6 +355,22 @@ class LabelValidator:
                     except Exception as notes_error:
                         print(f"❌ Error editing notes: {notes_error}")
 
+                elif command == "unclear":
+                    # Toggle unclear flag
+                    try:
+                        current_unclear = activity.get("unclear", 0)
+                        new_unclear = 1 if current_unclear == 0 else 0
+                        activity["unclear"] = new_unclear
+                        activity["human_edited"] = 1
+                        
+                        status = "unclear/unrelated" if new_unclear else "clear"
+                        print(f"\n❓ Activity marked as: {status}")
+                        
+                        write_json(activities, output_file)
+                        print(f"💾 Auto-saved after marking as {status}")
+                    except Exception as unclear_error:
+                        print(f"❌ Error toggling unclear flag: {unclear_error}")
+
                 elif command.startswith("f "):
                     # Quick edit single field
                     try:
@@ -381,6 +403,7 @@ class LabelValidator:
                     print("  j <number>  = Jump to activity number")
                     print("  f <field>   = Quick edit field (e.g., 'f 1' for ref group)")
                     print("  notes       = Edit notes for this activity")
+                    print("  unclear     = Toggle unclear/unrelated flag")
                     print("  s           = Save and continue")
                     print("  q           = Save and quit")
                     print("  h           = Show this help")

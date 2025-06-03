@@ -325,6 +325,7 @@ def generate_labels(activities: List[dict], model: str) -> List[dict]:
                         # Initialize tracking fields
                         "human_edited": 0,
                         "notes": "",
+                        "unclear": 0,
                     }
                 )
                 labeled.append(activity_copy)
