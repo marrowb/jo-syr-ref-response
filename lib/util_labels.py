@@ -9,6 +9,7 @@ import json
 import os
 from typing import Dict, List, Any
 from lib.util_file import read_json, write_json
+from definitions import DATASTORE_FIELDS
 
 
 class LabelValidator:
@@ -70,6 +71,28 @@ class LabelValidator:
         if isinstance(sector, list):
             sector = sector[0] if sector else 'N/A'
         print(f"   {sector}")
+        
+        # Add other narrative elements
+        print(f"\n📄 OTHER NARRATIVE ELEMENTS:")
+        narrative_fields = [field for field in DATASTORE_FIELDS if "narrative" in field and "xml_lang" not in field]
+        # Remove title, description, and sector as we already display them above
+        narrative_fields = [field for field in narrative_fields if field not in ['title_narrative', 'description_narrative', 'sector_narrative']]
+        
+        has_content = False
+        for field_name in narrative_fields:
+            value = activity.get(field_name, '')
+            if value and value.strip():
+                if not has_content:
+                    has_content = True
+                # Create display name from field name
+                display_name = field_name.replace('_narrative', '').replace('_', ' ').title()
+                # Truncate long values
+                if len(value) > 100:
+                    value = value[:100] + "..."
+                print(f"   • {display_name}: {value}")
+        
+        if not has_content:
+            print("   (No additional narrative content)")
         
         print(f"\n🤖 CURRENT LABELS:")
         for i, field in enumerate(self.label_fields, 1):
