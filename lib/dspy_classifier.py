@@ -1,11 +1,9 @@
-import json
 import random
 from typing import List, Literal
 
 import dspy
 
-from definitions import DATASTORE_FIELDS, RAW_ACTIVITIES, SECTOR_JSON_PATH
-from lib.util_file import read_json, write_json
+from definitions import DSPY_CONFIG, GEMINI_API_KEY, NARRATIVE_FIELDS
 
 
 class IATIClassifier(dspy.Signature):
@@ -139,7 +137,7 @@ class IATIClassifier(dspy.Signature):
             "mixed_or_unspecified_refugees",
         ]
     ] = dspy.OutputField(
-        desc="""To identify specific refugee nationalities or a general reference to refugees explicitly mentioned in the narrative as beneficiaries or a significant focus of the project. This attribute does not include vulnerable host country nationals (e.g., Jordanians). Multiple values from ["Syria", "Palestine", "Iraq", "Yemen", "Sudan", "Other"] can be selected if the project targets multiple distinct refugee groups from this list. "Other" should be used if a specific refugee group not listed (e.g. Somali refugees) is explicitly mentioned. "mixed_or_unspecified_refugees" should be used if the narrative mentions refugees as beneficiaries or a focus but does not specify their nationality, or refers to multiple groups without detailing them individually in a way that allows for separate tagging. This value should not be used if specific nationalities are identifiable and can be tagged from the other options. This field should be an empty list [] only if the narrative or project has no mention or indication of focusing on or including refugees. If refugees are mentioned but no specific group is identifiable, ["mixed_or_unspecified_refugees"] should be used."""
+        desc="""To identify specific refugee nationalities or a general reference to refugees explicitly mentioned in the narrative as beneficiaries or a significant focus of the project. This attribute does not include vulnerable host country nationals (e.g., Jordanians). Multiple values from ["Syria", "Palestine", "Iraq", "Yemen", "Sudan", "Other"] can be selected if the project targets multiple distinct refugee groups from this list. "Other" should be used if a specific refugee group not listed (e.g. Somali refugees) is explicitly mentioned. "mixed_or_unspecified_refugees" should be used if the narrative mentions refugees as beneficiaries or a focus but does not specify their nationality, or refers to multiple groups without detailing them individually in a way that allows for separate tagging. This value should not be used if specific nationalities are identifiable and can be tagged from the other options. This field should be an empty list [] only if the narrative or project has no mention or indication of focusing on or including refugees. If refugees are mentioned but no specific group is identifiable, ["mixed_or_unspecified_refugees"] should be used. If refugees are mentioned, but the program does not target refugees, this field should be an empty list []"""
     )
 
     llm_target_population: List[
@@ -149,7 +147,7 @@ class IATIClassifier(dspy.Signature):
     )
 
     llm_ref_setting: List[Literal["camp", "urban", "rural"]] = dspy.OutputField(
-        desc="""To describe the primary physical or social environment(s) where the project activities are stated to take place, particularly concerning vulnerable populations. Multiple values can be selected if activities explicitly occur across different setting types (e.g., ["camp", "urban"] if a project operates in both). "camp": Activities primarily occur within formal or informal refugee/IDP camp settings. "urban": Activities primarily occur in cities or towns. "rural": Activities primarily occur in countryside or non-urban settings. If the setting is not specified or unclear from the narrative, this field should be an empty list []."""
+        desc="""To describe the primary physical or social environment(s) where the project activities are stated to take place, particularly concerning vulnerable populations. Multiple values can be selected if activities explicitly occur across different setting types (e.g., ["camp", "urban"] if a project operates in both). "camp": Activities primarily occur within formal or informal refugee/IDP camp settings like Za'atari, Azraq, and EJC. "urban": Activities primarily occur in cities or towns. "rural": Activities primarily occur in countryside or non-urban settings. If the setting is not specified or unclear from the narrative, this field should be an empty list []."""
     )
 
     llm_geographic_focus: List[str] = dspy.OutputField(
@@ -377,30 +375,38 @@ def simple_metric(example, prediction, trace=None) -> float:
 def prepare_examples(activities: List[dict]) -> List[dspy.Example]:
     """Convert activities to DSPy examples."""
     examples = []
+    llm_fields = [
+        "llm_ref_group",
+        "llm_target_population",
+        "llm_ref_setting",
+        "llm_geographic_focus",
+        "llm_nexus",
+        "llm_funding_org",
+        "llm_implementing_org",
+    ]
+
     for activity in activities:
         if not activity.get("title_narrative"):
             continue
 
-        example = dspy.Example(
-            title_narrative=activity.get("title_narrative", ""),
-            description_narrative=activity.get("description_narrative", ""),
-            sector_narrative=activity.get("sector_narrative", ""),
-            llm_ref_group=activity.get("llm_ref_group", []),
-            llm_target_population=activity.get("llm_target_population", []),
-            llm_ref_setting=activity.get("llm_ref_setting", []),
-            llm_geographic_focus=activity.get("llm_geographic_focus", []),
-            llm_nexus=activity.get("llm_nexus", []),
-            llm_funding_org=activity.get("llm_funding_org", []),
-            llm_implementing_org=activity.get("llm_implementing_org", []),
-        ).with_inputs("title_narrative", "description_narrative", "sector_narrative")
+        example_kwargs = {
+            **{field: activity.get(field, "") for field in NARRATIVE_FIELDS},
+            **{field: activity.get(field, []) for field in llm_fields},
+        }
 
+        example = dspy.Example(**example_kwargs).with_inputs(*NARRATIVE_FIELDS)
         examples.append(example)
-
     return examples
 
 
 def train_model(examples: List[dspy.Example]) -> dspy.Module:
     """Train optimized classifier."""
+    task_model = dspy.LM(
+        DSPY_CONFIG["task_model"], api_key=GEMINI_API_KEY, max_tokens=4000
+    )
+    strong_model = dspy.LM(
+        DSPY_CONFIG["strong_model"], api_key=GEMINI_API_KEY, max_tokens=4000
+    )
     # Split data
     split_idx = int(len(examples) * 0.8)
     trainset = examples[:split_idx]
@@ -410,7 +416,12 @@ def train_model(examples: List[dspy.Example]) -> dspy.Module:
     classifier = dspy.ChainOfThought(IATIClassifier)
 
     # Optimize
-    optimizer = dspy.MIPROv2(metric=simple_metric, auto="light")
+    optimizer = dspy.MIPROv2(
+        metric=simple_metric,
+        auto="light",
+        # prompt_model=strong_model,
+        # task_model=task_model,
+    )
     optimized = optimizer.compile(
         classifier,
         trainset=trainset,
@@ -420,7 +431,7 @@ def train_model(examples: List[dspy.Example]) -> dspy.Module:
     )
 
     # Evaluate
-    evaluator = dspy.Evaluate(devset=devset, metric=simple_metric)
+    evaluator = dspy.Evaluate(devset=devset, metric=simple_metric, num_threads=10)
     score = evaluator(optimized)
     print(f"Final score: {score:.3f}")
 

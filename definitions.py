@@ -29,9 +29,19 @@ RAW_ACTIVITIES = os.path.join(
     ROOT_DIR, "data", "iati", "jordan_activities_all_fields.json"
 )
 
-with open("./reference/iati/datastore.yaml", "r") as f:
+DATASTORE_SCHEMA_PATH = os.path.join(ROOT_DIR, "reference", "iati", "datastore.yaml")
+
+with open(DATASTORE_SCHEMA_PATH, "r") as f:
     api_contract = load(f, Loader=Loader)
     DATASTORE_FIELDS = api_contract["components"]["schemas"][
         "Query_Response_All_IATI_Fields"
     ]["properties"]["response"]["properties"]["docs"]["items"]["properties"]
 
+NARRATIVE_FIELDS = [
+    field
+    for field in DATASTORE_FIELDS
+    if "narrative" in field and "xml_lang" not in field
+]
+
+MLFLOW_SERVER_PORT = 5050
+MLFLOW_SERVER_URI = f"http://127.0.0.1:{MLFLOW_SERVER_PORT}"

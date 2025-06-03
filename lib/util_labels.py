@@ -43,7 +43,7 @@ class LabelValidator:
             "llm_funding_org",
             "llm_implementing_org",
         ]
-        
+
         # Additional tracking fields
         self.tracking_fields = [
             "human_edited",
@@ -85,8 +85,8 @@ class LabelValidator:
         desc = activity.get("description_narrative", ["N/A"])
         if isinstance(desc, list):
             desc = desc[0] if desc else "N/A"
-        if isinstance(desc, str) and len(desc) > 300:
-            print(f"   {desc[:300]}...")
+        if isinstance(desc, str) and len(desc) > 3000:
+            print(f"   {desc[:3000]}...")
         else:
             print(f"   {desc}")
 
@@ -127,11 +127,11 @@ class LabelValidator:
                         value_str = ", ".join(str(v) for v in value if v)
                     else:
                         value_str = str(value)
-                    
+
                     # Truncate long values
-                    if len(value_str) > 100:
-                        value_str = value_str[:100] + "..."
-                    
+                    if len(value_str) > 1000:
+                        value_str = value_str[:1000] + "..."
+
                     if value_str.strip():  # Only show if there's actual content
                         print(f"   • {display_name}: {value_str}")
                 except Exception as e:
@@ -167,17 +167,17 @@ class LabelValidator:
                 options_display = "  │ Free text (comma-separated)"
 
             print(f"   {i}. {display_name:20} {value_display} {valid}{options_display}")
-        
+
         # Display tracking fields
         print(f"\n📝 TRACKING INFO:")
         human_edited = activity.get("human_edited", 0)
         edited_status = "✏️ Yes" if human_edited else "🤖 No"
         print(f"   Human Edited: {edited_status}")
-        
+
         unclear = activity.get("unclear", 0)
         unclear_status = "❓ Yes" if unclear else "✅ Clear"
         print(f"   Unclear/Unrelated: {unclear_status}")
-        
+
         notes = activity.get("notes", "")
         notes_display = notes if notes else "(no notes)"
         if len(notes_display) > 100:
@@ -343,8 +343,12 @@ class LabelValidator:
                     # Edit notes
                     try:
                         current_notes = activity.get("notes", "")
-                        print(f"\n📝 Current notes: {current_notes if current_notes else '(empty)'}")
-                        new_notes = input("Enter new notes (or press Enter to keep current): ").strip()
+                        print(
+                            f"\n📝 Current notes: {current_notes if current_notes else '(empty)'}"
+                        )
+                        new_notes = input(
+                            "Enter new notes (or press Enter to keep current): "
+                        ).strip()
                         if new_notes:
                             activity["notes"] = new_notes
                             activity["human_edited"] = 1
@@ -362,10 +366,10 @@ class LabelValidator:
                         new_unclear = 1 if current_unclear == 0 else 0
                         activity["unclear"] = new_unclear
                         activity["human_edited"] = 1
-                        
+
                         status = "unclear/unrelated" if new_unclear else "clear"
                         print(f"\n❓ Activity marked as: {status}")
-                        
+
                         write_json(activities, output_file)
                         print(f"💾 Auto-saved after marking as {status}")
                     except Exception as unclear_error:
@@ -401,7 +405,9 @@ class LabelValidator:
                     print("  e           = Edit current activity")
                     print("  b           = Go back to previous activity")
                     print("  j <number>  = Jump to activity number")
-                    print("  f <field>   = Quick edit field (e.g., 'f 1' for ref group)")
+                    print(
+                        "  f <field>   = Quick edit field (e.g., 'f 1' for ref group)"
+                    )
                     print("  notes       = Edit notes for this activity")
                     print("  unclear     = Toggle unclear/unrelated flag")
                     print("  s           = Save and continue")
@@ -422,7 +428,9 @@ class LabelValidator:
                         if 0 <= jump_to < len(activities):
                             current_index = jump_to
                         else:
-                            print(f"❌ Invalid activity number. Range: 1-{len(activities)}")
+                            print(
+                                f"❌ Invalid activity number. Range: 1-{len(activities)}"
+                            )
                     except (ValueError, IndexError):
                         print("❌ Invalid jump command. Use: j <number>")
 
@@ -456,10 +464,10 @@ class LabelValidator:
                     print(f"✅ Emergency save completed to {output_file}")
                 except Exception as emergency_save_error:
                     print(f"❌ Emergency save failed: {emergency_save_error}")
-                
+
                 # Ask user if they want to continue
                 continue_choice = input("Continue reviewing? (y/n): ").strip().lower()
-                if continue_choice != 'y':
+                if continue_choice != "y":
                     break
 
         # Final save
