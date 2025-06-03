@@ -45,7 +45,7 @@ class MLflowServerManager:
                     "--port",
                     str(self.port),
                     "--backend-store-uri",
-                    f"sqlite:///{self.db_path}",
+                    "./mlruns",
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
