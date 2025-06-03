@@ -152,6 +152,7 @@ class IATIClassifier(dspy.Signature):
         - Program explicitly targets "refugees" as beneficiaries but nationality is not specified
         - Multiple refugee groups are targeted but not individually identifiable
         - "refugee populations", "refugee beneficiaries" without nationality breakdown
+        - Activity is conducted by UNHCR or UNOCHA and no detailed description is given
 
         DO NOT use any values if:
         - Refugees are only mentioned in context/background
@@ -165,7 +166,7 @@ class IATIClassifier(dspy.Signature):
     llm_target_population: List[
         Literal["refugees", "host_communities", "general_population"]
     ] = dspy.OutputField(
-        """CRITICAL: Identify populations that are EXPLICITLY and DIRECTLY TARGETED as BENEFICIARIES of the aid program's activities and services. The program must be designed TO SERVE or PROVIDE DIRECT ASSISTANCE TO these populations.
+        desc="""CRITICAL: Identify populations that are EXPLICITLY and DIRECTLY TARGETED as BENEFICIARIES of the aid program's activities and services. The program must be designed TO SERVE or PROVIDE DIRECT ASSISTANCE TO these populations.
 
         IMPORTANT DISTINCTION: Do NOT include a population if they are only mentioned as a contextual factor, a reason for the project, or an indirect/potential beneficiary. Focus on who the project's services are DELIVERED TO.
 
@@ -190,7 +191,7 @@ class IATIClassifier(dspy.Signature):
         """
     )
 
-      llm_ref_setting: List[Literal["camp", "urban", "rural"]] = dspy.OutputField(
+    llm_ref_setting: List[Literal["camp", "urban", "rural"]] = dspy.OutputField(
         desc="""CRITICAL: Identify the SPECIFIC physical setting(s) where project activities are EXPLICITLY STATED to take place. Vague references or broad administrative areas (like a governorate) are NOT sufficient unless they are the most specific detail provided and inherently imply a setting (e.g., "agricultural activities in X governorate" implies rural).
 
         "camp": ONLY when activities explicitly occur IN or are delivered directly TO RECIPIENTS IN refugee camps.
