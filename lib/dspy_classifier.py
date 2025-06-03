@@ -137,17 +137,87 @@ class IATIClassifier(dspy.Signature):
             "mixed_or_unspecified_refugees",
         ]
     ] = dspy.OutputField(
-        desc="""To identify specific refugee nationalities or a general reference to refugees explicitly mentioned in the narrative as beneficiaries or a significant focus of the project. This attribute does not include vulnerable host country nationals (e.g., Jordanians). Multiple values from ["Syria", "Palestine", "Iraq", "Yemen", "Sudan", "Other"] can be selected if the project targets multiple distinct refugee groups from this list. "Other" should be used if a specific refugee group not listed (e.g. Somali refugees) is explicitly mentioned. "mixed_or_unspecified_refugees" should be used if the narrative mentions refugees as beneficiaries or a focus but does not specify their nationality, or refers to multiple groups without detailing them individually in a way that allows for separate tagging. This value should not be used if specific nationalities are identifiable and can be tagged from the other options. This field should be an empty list [] only if the narrative or project has no mention or indication of focusing on or including refugees. If refugees are mentioned but no specific group is identifiable, ["mixed_or_unspecified_refugees"] should be used. If refugees are mentioned, but the program does not target refugees, this field should be an empty list []"""
+        desc="""CRITICAL: Identify refugee nationalities ONLY when refugees are explicitly mentioned as BENEFICIARIES or TARGET POPULATION of the aid program.
+
+        Use specific nationalities ("Syria", "Palestine", "Iraq", "Yemen", "Sudan") ONLY when:
+        - Program explicitly targets/serves refugees from these countries
+        - "Syrian refugees", "Palestinian refugees", etc. are mentioned as beneficiaries
+        - Activities are designed specifically for these refugee populations
+
+        Use "Other" ONLY when:
+        - Program explicitly targets refugees from countries not listed (e.g., "Somali refugees", "Sudanese refugees")
+        - Must be clear they are beneficiaries, not just mentioned
+
+        Use "mixed_or_unspecified_refugees" ONLY when:
+        - Program explicitly targets "refugees" as beneficiaries but nationality is not specified
+        - Multiple refugee groups are targeted but not individually identifiable
+        - "refugee populations", "refugee beneficiaries" without nationality breakdown
+
+        DO NOT use any values if:
+        - Refugees are only mentioned in context/background
+        - Program is about refugee coordination/management without direct service
+        - Activities happen in refugee areas but don't target refugees as beneficiaries
+        - General capacity building that may indirectly affect refugees
+
+        Empty list [] if no refugees are explicitly targeted as beneficiaries. Be very conservative - targeting must be explicit and clear."""
     )
 
     llm_target_population: List[
         Literal["refugees", "host_communities", "general_population"]
     ] = dspy.OutputField(
-        desc="""To describe the broader categories of populations the project aims to serve, based on explicit mentions in the narrative. Multiple values can be selected. For instance, a project targeting both refugees and the communities that host them would have ["refugees", "host_communities"]. "refugees": Used when the project explicitly targets refugees (regardless of specific nationality, which is covered by llm_ref_group). "host_communities": Used when the project explicitly targets the communities accommodating refugees (e.g., vulnerable Jordanians in areas with high refugee presence). "general_population": Used when the project targets the wider population without a primary, explicit focus on refugee/host community dynamics, or if it's a national-level initiative not specifically disaggregated. If the target population is not clearly delineated in the narrative according to these categories, this field should be an empty list []."""
+        desc="""CRITICAL: Identify populations that are EXPLICITLY TARGETED as beneficiaries of the aid program. Mere mention is NOT sufficient - the program must be designed to serve these populations.
+
+        "refugees": ONLY when the project explicitly states it TARGETS, SERVES, or BENEFITS refugees as primary beneficiaries. Look for:
+        - "targeting refugees", "serving refugee populations", "benefiting refugees"
+        - "refugee beneficiaries", "assistance to refugees", "support for refugees"
+        - Programs specifically designed for refugee needs (livelihood, protection, education for refugees)
+        - Services delivered TO refugees (not just in refugee areas)
+        
+        DO NOT use "refugees" if:
+        - Refugees are only mentioned in context or background
+        - Program is about refugee management/coordination without direct service
+        - Activities happen in refugee areas but don't target refugees specifically
+        - General capacity building that may indirectly affect refugees
+
+        "host_communities": ONLY when explicitly targeting local/host populations affected by refugee presence:
+        - "vulnerable Jordanians", "host community members", "local communities hosting refugees"
+        - "communities affected by refugee influx", "vulnerable locals in refugee-hosting areas"
+        - Programs specifically for host community needs/tensions
+
+        "general_population": ONLY when targeting broader national population without refugee-specific focus:
+        - "all Jordanians", "national program", "general public", "citizens"
+        - Government capacity building, national systems strengthening
+        - Programs with no refugee/displacement context
+
+        Multiple values allowed ONLY if program explicitly targets multiple groups. If targeting is unclear or ambiguous, use empty list []. Be conservative - when in doubt, leave empty."""
     )
 
     llm_ref_setting: List[Literal["camp", "urban", "rural"]] = dspy.OutputField(
-        desc="""To describe the primary physical or social environment(s) where the project activities are stated to take place, particularly concerning vulnerable populations. Multiple values can be selected if activities explicitly occur across different setting types (e.g., ["camp", "urban"] if a project operates in both). "camp": Activities primarily occur within formal or informal refugee/IDP camp settings like Za'atari, Azraq, and EJC. "urban": Activities primarily occur in cities or towns. "rural": Activities primarily occur in countryside or non-urban settings. If the setting is not specified or unclear from the narrative, this field should be an empty list []."""
+        desc="""CRITICAL: Identify the SPECIFIC physical setting where project activities are EXPLICITLY stated to occur. Vague references are not sufficient.
+
+        "camp": ONLY when activities explicitly occur in refugee camps:
+        - Named camps: "Za'atari camp", "Azraq camp", "EJC", "Emirati Jordanian Camp"
+        - Clear camp references: "in refugee camps", "camp-based activities", "within the camps"
+        - Camp-specific services: "camp management", "camp facilities", "camp infrastructure"
+
+        "urban": ONLY when activities explicitly occur in cities/towns:
+        - Named cities: "Amman", "Irbid", "Zarqa", "Mafraq city", "Aqaba"
+        - Clear urban references: "urban areas", "city centers", "metropolitan areas", "municipal"
+        - Urban-specific context: "city-based services", "urban planning", "downtown"
+
+        "rural": ONLY when activities explicitly occur in rural/countryside areas:
+        - Clear rural references: "rural areas", "countryside", "villages", "remote areas"
+        - Agricultural context: "farming communities", "agricultural areas", "pastoral regions"
+        - Non-urban geographic: "border villages", "desert communities", "mountainous areas"
+
+        Multiple values allowed ONLY if activities explicitly span multiple settings (e.g., "activities in both camps and urban areas").
+
+        DO NOT infer setting from:
+        - Governorate names alone (e.g., "Mafraq governorate" without specifics)
+        - Organization types (UNHCR doesn't automatically mean camps)
+        - General geographic references ("northern Jordan" without specifics)
+
+        If setting is not explicitly clear, use empty list []. Be conservative."""
     )
 
     llm_geographic_focus: List[str] = dspy.OutputField(

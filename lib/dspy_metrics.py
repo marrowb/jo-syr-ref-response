@@ -7,15 +7,15 @@ import mlflow
 def weighted_metric(example, prediction, trace=None) -> float:
     """Weighted metric prioritizing critical fields."""
 
-    # Define field weights based on importance
+    # Define field weights based on importance and current performance
     field_weights = {
-        "llm_ref_group": 3.0,  # Critical - refugee identification
-        "llm_target_population": 3.0,  # Critical - who is served
-        "llm_ref_setting": 2.5,  # Important - camp vs. setting
-        "llm_nexus": 2.0,  # Important - humanitarian vs development
-        "llm_geographic_focus": 1.0,  # Nice to have
-        "llm_funding_org": 0.5,  # Less critical
-        "llm_implementing_org": 0.5,  # Less critical
+        "llm_ref_group": 3.0,           # Critical - refugee identification (performing well)
+        "llm_target_population": 4.0,   # CRITICAL - who is served (needs improvement)
+        "llm_ref_setting": 3.5,        # CRITICAL - camp vs. setting (needs improvement)
+        "llm_nexus": 2.0,              # Important - humanitarian vs development
+        "llm_geographic_focus": 1.0,    # Nice to have (performing well)
+        "llm_funding_org": 0.5,        # Less critical
+        "llm_implementing_org": 0.3,   # Less critical (worst performer)
     }
 
     total_weighted_score = 0
