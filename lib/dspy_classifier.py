@@ -172,10 +172,10 @@ class IATIClassifier(dspy.Signature):
         - "refugee beneficiaries", "assistance to refugees", "support for refugees"
         - Programs specifically designed for refugee needs (livelihood, protection, education for refugees)
         - Services delivered TO refugees (not just in refugee areas)
+        - Refugees are beneficiaries of the program
         
         DO NOT use "refugees" if:
         - Refugees are only mentioned in context or background
-        - Program is about refugee management/coordination without direct service
         - Activities happen in refugee areas but don't target refugees specifically
         - General capacity building that may indirectly affect refugees
 
@@ -405,5 +405,3 @@ def generate_labels(activities: List[dict], model: str) -> List[dict]:
                 continue
     print("Classified all results.")
     return labeled
-
-

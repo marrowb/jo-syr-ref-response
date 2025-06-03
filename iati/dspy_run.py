@@ -8,8 +8,7 @@ from definitions import DSPY_CONFIG, GEMINI_API_KEY, ROOT_DIR
 from lib.dspy_classifier import smart_sample, generate_labels
 from lib.dspy_optimizer import train_model, prepare_examples
 from lib.util_file import read_json, write_json
-from lib.util_mlflow import setup_mlflow_tracking, MLflowServerManager
-
+from lib.util_mlfow import setup_mlflow_tracking, MLflowServerManager
 
 def setup_dspy_config():
     """Configure DSPy with the specified model."""
