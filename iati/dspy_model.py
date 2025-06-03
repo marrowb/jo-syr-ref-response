@@ -72,8 +72,8 @@ def main():
         sys.exit(1)
 
     # 2. Setup tracking and configuration
-    experiment_name = f"dspy-aid-activity-classification_{datetime.now().strftime("%Y-%m-%d_%H:%M:%S")}"
-    setup_mlflow_tracking(experiment_name=experiment_name)
+    # experiment_name = f"dspy-aid-activity-classification_{datetime.now().strftime("%Y-%m-%d_%H:%M:%S")}"
+    setup_mlflow_tracking("dspy-aid-activity-classification")
     setup_dspy_config()
 
     # 3. Depending on what stage of model training you're at
