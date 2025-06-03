@@ -3,7 +3,7 @@ from typing import List, Literal
 
 import dspy
 
-from definitions import DSPY_CONFIG, GEMINI_API_KEY, NARRATIVE_FIELDS
+from definitions import DSPY_CONFIG, GEMINI_API_KEY
 
 
 class IATIClassifier(dspy.Signature):
@@ -337,102 +337,3 @@ def generate_labels(activities: List[dict], model: str) -> List[dict]:
     return labeled
 
 
-def simple_metric(example, prediction, trace=None) -> float:
-    """Simple overall accuracy metric."""
-    total_score = 0
-    total_fields = 0
-
-    fields = [
-        "llm_ref_group",
-        "llm_target_population",
-        "llm_ref_setting",
-        "llm_geographic_focus",
-        "llm_nexus",
-        "llm_funding_org",
-        "llm_implementing_org",
-    ]
-
-    for field in fields:
-        if hasattr(example, field) and hasattr(prediction, field):
-            expected = set(getattr(example, field, []))
-            predicted = set(getattr(prediction, field, []))
-
-            if len(expected) == 0 and len(predicted) == 0:
-                score = 1.0
-            elif len(expected) == 0 or len(predicted) == 0:
-                score = 0.0
-            else:
-                intersection = len(expected.intersection(predicted))
-                union = len(expected.union(predicted))
-                score = intersection / union if union > 0 else 0.0
-
-            total_score += score
-            total_fields += 1
-
-    return total_score / total_fields if total_fields > 0 else 0.0
-
-
-def prepare_examples(activities: List[dict]) -> List[dspy.Example]:
-    """Convert activities to DSPy examples."""
-    examples = []
-    llm_fields = [
-        "llm_ref_group",
-        "llm_target_population",
-        "llm_ref_setting",
-        "llm_geographic_focus",
-        "llm_nexus",
-        "llm_funding_org",
-        "llm_implementing_org",
-    ]
-
-    for activity in activities:
-        if not activity.get("title_narrative"):
-            continue
-
-        example_kwargs = {
-            **{field: activity.get(field, "") for field in NARRATIVE_FIELDS},
-            **{field: activity.get(field, []) for field in llm_fields},
-        }
-
-        example = dspy.Example(**example_kwargs).with_inputs(*NARRATIVE_FIELDS)
-        examples.append(example)
-    return examples
-
-
-def train_model(examples: List[dspy.Example]) -> dspy.Module:
-    """Train optimized classifier."""
-    task_model = dspy.LM(
-        DSPY_CONFIG["task_model"], api_key=GEMINI_API_KEY, max_tokens=4000
-    )
-    strong_model = dspy.LM(
-        DSPY_CONFIG["strong_model"], api_key=GEMINI_API_KEY, max_tokens=4000
-    )
-    # Split data
-    split_idx = int(len(examples) * 0.8)
-    trainset = examples[:split_idx]
-    devset = examples[split_idx:]
-
-    # Create classifier
-    classifier = dspy.ChainOfThought(IATIClassifier)
-
-    # Optimize
-    optimizer = dspy.MIPROv2(
-        metric=simple_metric,
-        auto="light",
-        # prompt_model=strong_model,
-        # task_model=task_model,
-    )
-    optimized = optimizer.compile(
-        classifier,
-        trainset=trainset,
-        max_bootstrapped_demos=3,
-        max_labeled_demos=5,
-        requires_permission_to_run=False,
-    )
-
-    # Evaluate
-    evaluator = dspy.Evaluate(devset=devset, metric=simple_metric, num_threads=10)
-    score = evaluator(optimized)
-    print(f"Final score: {score:.3f}")
-
-    return optimized
