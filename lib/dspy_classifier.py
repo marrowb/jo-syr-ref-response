@@ -322,6 +322,9 @@ def generate_labels(activities: List[dict], model: str) -> List[dict]:
                         "llm_nexus": result_dict.get("llm_nexus"),
                         "llm_funding_org": result_dict.get("llm_funding_org"),
                         "llm_implementing_org": result_dict.get("llm_implementing_org"),
+                        # Initialize tracking fields
+                        "human_edited": 0,
+                        "notes": "",
                     }
                 )
                 labeled.append(activity_copy)

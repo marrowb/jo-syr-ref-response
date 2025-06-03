@@ -43,6 +43,12 @@ class LabelValidator:
             "llm_funding_org",
             "llm_implementing_org",
         ]
+        
+        # Additional tracking fields
+        self.tracking_fields = [
+            "human_edited",
+            "notes",
+        ]
 
     def validate_field(self, field_name: str, value: List) -> bool:
         """Validate a specific field against allowed values."""
@@ -160,6 +166,18 @@ class LabelValidator:
                 options_display = "  │ Free text (comma-separated)"
 
             print(f"   {i}. {display_name:20} {value_display} {valid}{options_display}")
+        
+        # Display tracking fields
+        print(f"\n📝 TRACKING INFO:")
+        human_edited = activity.get("human_edited", 0)
+        edited_status = "✏️ Yes" if human_edited else "🤖 No"
+        print(f"   Human Edited: {edited_status}")
+        
+        notes = activity.get("notes", "")
+        notes_display = notes if notes else "(no notes)"
+        if len(notes_display) > 100:
+            notes_display = notes_display[:100] + "..."
+        print(f"   Notes: {notes_display}")
 
     def edit_field(self, current_value: List, field_name: str) -> List:
         """Interactive editing of a field value with user-friendly input."""
@@ -276,6 +294,7 @@ class LabelValidator:
         print("  b           = Go back to previous activity")
         print("  j <number>  = Jump to activity number")
         print("  f <field>   = Quick edit field (e.g., 'f 1' for ref group)")
+        print("  notes       = Edit notes for this activity")
         print("  s           = Save and continue")
         print("  q           = Save and quit")
         print("  h           = Show this help")
@@ -306,11 +325,29 @@ class LabelValidator:
                     # Edit current activity
                     try:
                         self.edit_activity(activity)
+                        # Mark as human edited
+                        activity["human_edited"] = 1
                         # Auto-save after editing
                         write_json(activities, output_file)
                         print(f"💾 Auto-saved after editing")
                     except Exception as edit_error:
                         print(f"❌ Error during editing: {edit_error}")
+
+                elif command == "notes":
+                    # Edit notes
+                    try:
+                        current_notes = activity.get("notes", "")
+                        print(f"\n📝 Current notes: {current_notes if current_notes else '(empty)'}")
+                        new_notes = input("Enter new notes (or press Enter to keep current): ").strip()
+                        if new_notes:
+                            activity["notes"] = new_notes
+                            activity["human_edited"] = 1
+                            write_json(activities, output_file)
+                            print(f"✅ Notes updated and auto-saved")
+                        else:
+                            print("📝 Notes unchanged")
+                    except Exception as notes_error:
+                        print(f"❌ Error editing notes: {notes_error}")
 
                 elif command.startswith("f "):
                     # Quick edit single field
@@ -321,6 +358,8 @@ class LabelValidator:
                             current_value = activity.get(field_name, [])
                             new_value = self.edit_field(current_value, field_name)
                             activity[field_name] = new_value
+                            # Mark as human edited
+                            activity["human_edited"] = 1
                             # Auto-save after field edit
                             write_json(activities, output_file)
                             print(f"💾 Auto-saved after field edit")
@@ -341,6 +380,7 @@ class LabelValidator:
                     print("  b           = Go back to previous activity")
                     print("  j <number>  = Jump to activity number")
                     print("  f <field>   = Quick edit field (e.g., 'f 1' for ref group)")
+                    print("  notes       = Edit notes for this activity")
                     print("  s           = Save and continue")
                     print("  q           = Save and quit")
                     print("  h           = Show this help")
@@ -464,6 +504,8 @@ class LabelValidator:
                         current_value = activity.get(field_name, [])
                         new_value = self.edit_field(current_value, field_name)
                         activity[field_name] = new_value
+                        # Mark as human edited when any field is changed
+                        activity["human_edited"] = 1
                     else:
                         print(
                             f"❌ Invalid field number. Range: 1-{len(self.label_fields)}"
