@@ -114,10 +114,21 @@ class LabelValidator:
                 display_name = (
                     field_name.replace("_narrative", "").replace("_", " ").title()
                 )
-                # Truncate long values
-                if len(value) > 100:
-                    value = value[:100] + "..."
-                print(f"   • {display_name}: {value}")
+                # Handle both string and list values safely
+                try:
+                    if isinstance(value, list):
+                        value_str = ", ".join(str(v) for v in value if v)
+                    else:
+                        value_str = str(value)
+                    
+                    # Truncate long values
+                    if len(value_str) > 100:
+                        value_str = value_str[:100] + "..."
+                    
+                    if value_str.strip():  # Only show if there's actual content
+                        print(f"   • {display_name}: {value_str}")
+                except Exception as e:
+                    print(f"   • {display_name}: [Error displaying value: {e}]")
 
         if not has_content:
             print("   (No additional narrative content)")
@@ -258,8 +269,9 @@ class LabelValidator:
 
         print(f"🚀 Starting review of {len(activities)} activities")
         print(f"📁 Will save corrected labels to: {output_file}")
+        print("💾 Auto-saving after each activity to prevent data loss")
         print("\n🎮 COMMANDS:")
-        print("  Enter/n     = Next activity")
+        print("  Enter/n     = Next activity (auto-saves)")
         print("  e           = Edit current activity")
         print("  b           = Go back to previous activity")
         print("  j <number>  = Jump to activity number")
@@ -271,87 +283,128 @@ class LabelValidator:
         current_index = 0
 
         while current_index < len(activities):
-            activity = activities[current_index]
-            self.display_activity(activity, current_index, len(activities))
+            try:
+                activity = activities[current_index]
+                self.display_activity(activity, current_index, len(activities))
 
-            command = (
-                input(f"\n[{current_index + 1}/{len(activities)}] Command: ")
-                .strip()
-                .lower()
-            )
+                command = (
+                    input(f"\n[{current_index + 1}/{len(activities)}] Command: ")
+                    .strip()
+                    .lower()
+                )
 
-            if command == "" or command == "n":
-                # Next activity
-                current_index += 1
+                if command == "" or command == "n":
+                    # Next activity - auto-save progress
+                    try:
+                        write_json(activities, output_file)
+                        print(f"💾 Auto-saved progress")
+                    except Exception as save_error:
+                        print(f"⚠️  Warning: Could not auto-save: {save_error}")
+                    current_index += 1
 
-            elif command == "e":
-                # Edit current activity
-                self.edit_activity(activity)
+                elif command == "e":
+                    # Edit current activity
+                    try:
+                        self.edit_activity(activity)
+                        # Auto-save after editing
+                        write_json(activities, output_file)
+                        print(f"💾 Auto-saved after editing")
+                    except Exception as edit_error:
+                        print(f"❌ Error during editing: {edit_error}")
 
-            elif command.startswith("f "):
-                # Quick edit single field
-                try:
-                    field_num = int(command.split()[1]) - 1
-                    if 0 <= field_num < len(self.label_fields):
-                        field_name = self.label_fields[field_num]
-                        current_value = activity.get(field_name, [])
-                        new_value = self.edit_field(current_value, field_name)
-                        activity[field_name] = new_value
+                elif command.startswith("f "):
+                    # Quick edit single field
+                    try:
+                        field_num = int(command.split()[1]) - 1
+                        if 0 <= field_num < len(self.label_fields):
+                            field_name = self.label_fields[field_num]
+                            current_value = activity.get(field_name, [])
+                            new_value = self.edit_field(current_value, field_name)
+                            activity[field_name] = new_value
+                            # Auto-save after field edit
+                            write_json(activities, output_file)
+                            print(f"💾 Auto-saved after field edit")
+                        else:
+                            print(
+                                f"❌ Invalid field number. Range: 1-{len(self.label_fields)}"
+                            )
+                    except (ValueError, IndexError):
+                        print("❌ Invalid field command. Use: f <number>")
+                    except Exception as field_error:
+                        print(f"❌ Error during field edit: {field_error}")
+
+                elif command == "h":
+                    # Show help
+                    print("\n🎮 COMMANDS:")
+                    print("  Enter/n     = Next activity (auto-saves)")
+                    print("  e           = Edit current activity")
+                    print("  b           = Go back to previous activity")
+                    print("  j <number>  = Jump to activity number")
+                    print("  f <field>   = Quick edit field (e.g., 'f 1' for ref group)")
+                    print("  s           = Save and continue")
+                    print("  q           = Save and quit")
+                    print("  h           = Show this help")
+
+                elif command == "b":
+                    # Previous activity
+                    if current_index > 0:
+                        current_index -= 1
                     else:
-                        print(
-                            f"❌ Invalid field number. Range: 1-{len(self.label_fields)}"
-                        )
-                except (ValueError, IndexError):
-                    print("❌ Invalid field command. Use: f <number>")
+                        print("❌ Already at first activity")
 
-            elif command == "h":
-                # Show help
-                print("\n🎮 COMMANDS:")
-                print("  Enter/n     = Next activity")
-                print("  e           = Edit current activity")
-                print("  b           = Go back to previous activity")
-                print("  j <number>  = Jump to activity number")
-                print("  f <field>   = Quick edit field (e.g., 'f 1' for ref group)")
-                print("  s           = Save and continue")
-                print("  q           = Save and quit")
-                print("  h           = Show this help")
+                elif command.startswith("j "):
+                    # Jump to activity
+                    try:
+                        jump_to = int(command.split()[1]) - 1
+                        if 0 <= jump_to < len(activities):
+                            current_index = jump_to
+                        else:
+                            print(f"❌ Invalid activity number. Range: 1-{len(activities)}")
+                    except (ValueError, IndexError):
+                        print("❌ Invalid jump command. Use: j <number>")
 
-            elif command == "b":
-                # Previous activity
-                if current_index > 0:
-                    current_index -= 1
+                elif command == "s":
+                    # Save and continue
+                    try:
+                        write_json(activities, output_file)
+                        print(f"✅ Saved progress to {output_file}")
+                        current_index += 1
+                    except Exception as save_error:
+                        print(f"❌ Error saving: {save_error}")
+
+                elif command == "q":
+                    # Save and quit
+                    try:
+                        write_json(activities, output_file)
+                        print(f"✅ Saved final results to {output_file}")
+                        break
+                    except Exception as save_error:
+                        print(f"❌ Error saving: {save_error}")
+                        break
+
                 else:
-                    print("❌ Already at first activity")
+                    print("❌ Unknown command")
 
-            elif command.startswith("j "):
-                # Jump to activity
+            except Exception as main_error:
+                print(f"❌ Unexpected error: {main_error}")
+                print("Attempting to save current progress...")
                 try:
-                    jump_to = int(command.split()[1]) - 1
-                    if 0 <= jump_to < len(activities):
-                        current_index = jump_to
-                    else:
-                        print(f"❌ Invalid activity number. Range: 1-{len(activities)}")
-                except (ValueError, IndexError):
-                    print("❌ Invalid jump command. Use: j <number>")
-
-            elif command == "s":
-                # Save and continue
-                write_json(activities, output_file)
-                print(f"✅ Saved progress to {output_file}")
-                current_index += 1
-
-            elif command == "q":
-                # Save and quit
-                write_json(activities, output_file)
-                print(f"✅ Saved final results to {output_file}")
-                break
-
-            else:
-                print("❌ Unknown command")
+                    write_json(activities, output_file)
+                    print(f"✅ Emergency save completed to {output_file}")
+                except Exception as emergency_save_error:
+                    print(f"❌ Emergency save failed: {emergency_save_error}")
+                
+                # Ask user if they want to continue
+                continue_choice = input("Continue reviewing? (y/n): ").strip().lower()
+                if continue_choice != 'y':
+                    break
 
         # Final save
-        write_json(activities, output_file)
-        print(f"\n🎉 Review complete! Corrected labels saved to {output_file}")
+        try:
+            write_json(activities, output_file)
+            print(f"\n🎉 Review complete! Corrected labels saved to {output_file}")
+        except Exception as final_save_error:
+            print(f"❌ Final save error: {final_save_error}")
 
     def edit_activity(self, activity: Dict):
         """Edit all fields of an activity."""
