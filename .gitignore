@@ -2,3 +2,8 @@
 .env
 .aider*
 __pycache__/
+mlruns/
+mlrun/
+*.sqlite
+archive/
+bak/
