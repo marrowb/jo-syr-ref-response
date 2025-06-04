@@ -32,8 +32,8 @@ async def label_all_activities_async(
 
     print(f"Processing {len(remaining)}/{len(activities)} activities")
 
-    # Process batches
-    semaphore = asyncio.Semaphore(60)  # Rate limiting
+    # Process batches with conservative rate limiting
+    semaphore = asyncio.Semaphore(10)  # Much lower concurrency
 
     for i in range(0, len(remaining), batch_size):
         batch = remaining[i : i + batch_size]
@@ -68,7 +68,7 @@ async def label_all_activities_async(
         _save_progress(progress, progress_path)
 
         print(f"Batch {i//batch_size + 1}: {len(successful)}/{len(batch)} successful")
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(2.0)  # Longer pause between batches
 
 
 async def _classify_activity(model, activity, semaphore):

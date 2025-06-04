@@ -147,7 +147,7 @@ def main():
     asyncio.run(
         batch_classify(
             model_path=model,  # Your model path
-            batch_size=50,
+            batch_size=10,  # Much smaller batches
         )
     )
 
