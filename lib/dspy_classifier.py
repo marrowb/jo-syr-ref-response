@@ -162,7 +162,7 @@ class IATIClassifier(dspy.Signature):
     llm_target_population: List[
         Literal["refugees", "host_communities", "general_population"]
     ] = dspy.OutputField(
-        desc="""CRITICAL: Identify populations that DIRECTLY RECEIVE project services. Be extremely conservative.
+        desc="""CRITICAL: Identify populations that DIRECTLY RECEIVE project services. Be EXTREMELY conservative.
 
         "refugees": ONLY when text explicitly states refugees receive direct services
         - REQUIRED phrases: "assistance to refugees", "services for refugees", "refugee beneficiaries", "targeting refugees"
@@ -177,115 +177,129 @@ class IATIClassifier(dspy.Signature):
 
         AUTOMATIC EMPTY LIST [] for:
         - Administrative projects ("Administration", "Operations", "Miscellaneous", "Travel", "Oversight")
-        - Unclear or vague descriptions
-        - Projects mentioning refugees only as context, not beneficiaries
+        - "Expert exchange", "professional exchanges" (no clear beneficiaries)
+        - "Scholarship distribution" without beneficiary details
+        - Projects about "mapping", "assessment", "evaluation"
+        - Budget/expenditure projects without service details
+        - Any project where you have to guess who benefits
 
         EXAMPLES:
         - "Protection targeting Syrian refugees and host communities" → ["refugees", "host_communities"]
         - "UNICEF child abuse reporting at UNRWA centres" → ["refugees"] (UNRWA serves refugees)
         - "Administrative costs and operating expenses" → []
-        - "Red Cross activities in Jordan" (no beneficiary details) → []
-        - "Energy toolkit for women and girls in refugee settings" → ["refugees"]"""
+        - "DISTRIBUTION OF SCHOLARSHIPS" without beneficiary details → []
+        - "Project support for professional exchanges" → []
+        - "Mapping of gender equality" → []
+        - "Healthy Ecosystems for Rangeland Development" without beneficiary details → []"""
     )
 
     llm_ref_setting: List[Literal["camp", "urban", "rural"]] = dspy.OutputField(
-        desc="""Identify ALL physical settings where activities occur. MULTIPLE values required for multi-location projects.
+        desc="""Identify physical settings ONLY when explicitly mentioned. Be VERY CONSERVATIVE.
 
-        "camp": Any mention of refugee camps, named camps (Za'atari, Azraq, EJC, etc.), "camp settings"
-        "urban": Cities, towns, urban areas, municipal services
-        "rural": Villages, rural communities, agricultural areas
+        "camp": Any mention of refugee camps, named camps (Za'atari, Azraq, EJC, etc.), "camp settings", "Marka Camp"
+        "urban": Cities, towns, urban areas, municipal services explicitly mentioned
+        "rural": Villages, rural communities, agricultural areas explicitly mentioned
 
-        CRITICAL - INCLUDE MULTIPLE SETTINGS when:
-        - "throughout Jordan", "across the country", "six governorates" → likely ["urban", "rural", "camp"]
+        INCLUDE MULTIPLE SETTINGS when:
+        - "throughout Jordan" with activity details → likely ["urban", "rural", "camp"]
         - "all across the country through six governorates" → ["urban", "rural", "camp"]
-        - Multiple governorates mentioned → likely ["urban", "rural"]
-        - National scope projects → typically ["urban", "rural"]
+        - Multiple governorates mentioned with service delivery → likely ["urban", "rural"]
+
+        EMPTY LIST [] for:
+        - Administrative/budget/expenditure projects
+        - Projects with no geographic details beyond country name
+        - "National" programs without setting specification
+        - Projects where setting cannot be determined
 
         EXAMPLES:
-        - "targeting six governorates of Irbid, Madaba, Amman, Karak, Ma'an and Tafileh" → ["urban", "rural", "camp"]
+        - "targeting six governorates with protection services" → ["urban", "rural", "camp"]
         - "Primary Health Care in Jordan" → ["urban", "rural"]
         - "activities at UNRWA centres and NGOs" → ["camp", "urban"]
-        - "Amman" only → ["urban"]
-
-        Empty list [] only if NO geographic details provided."""
+        - "2020Programme Budget - Health Programme" → [] (no settings mentioned)
+        - "Jordan School Construction throughout Jordan" → ["urban", "rural"] (schools typically not in camps)"""
     )
 
     llm_geographic_focus: List[str] = dspy.OutputField(
-        desc="""List specific locations mentioned, using EXACT names from text.
+        desc="""List specific locations mentioned, using EXACT names from text. Handle name variations carefully.
 
-        Include:
-        - Governorates: "Irbid", "Madaba", "Amman", "Karak", "Ma'an", "Tafileh", "Al Karak", "Al Tafilah"
-        - Cities: "Amman", "Washington DC", "Stockholm", etc.
-        - Regions: "Middle East and North Africa", "northern Jordan"
-        - Countries: "Jordan", "Ukraine", etc.
-        - Use "national" if explicitly described as nationwide scope
-
-        EXTRACT ALL mentioned locations, not just primary focus.
+        CRITICAL RULES:
+        - Use EXACT names as they appear: "Karak" and "Al Karak" are DIFFERENT if both mentioned
+        - Do NOT add "Jordan" if only sub-national locations mentioned (e.g., just "Amman" = ["Amman"], not ["Amman", "Jordan"])
+        - Use "national" ONLY if explicitly stated as nationwide/country-wide scope
+        - For target locations only - ignore source countries in exchange programs
+        - Extract locations from titles AND descriptions
 
         EXAMPLES:
-        - "six governorates of Irbid, Madaba, Amman, Karak, Ma'an and Tafileh" → ["Irbid", "Madaba", "Amman", "Karak", "Ma'an", "Tafileh"]
-        - "Washington DC, USA/Amman, Jordan" → ["Washington DC", "Amman", "Jordan"]
-        - "throughout Jordan" → ["national"]"""
+        - "six governorates of Irbid, Madaba, Amman, Karak, Ma'an and Tafileh" → ["Irbid", "Madaba", "Amman", "Karak", "Ma'an", "Tafileh"] (use names as written)
+        - "seminar with participants from Egypt, Jordan and Tunisia" → ["Egypt", "Jordan", "Tunisia"] (all mentioned)
+        - "capacity building support to Jordan audit institution" → ["Jordan"] (national scope)
+        - "Water Resources Management in Amman" → ["Amman"] (not ["Amman", "Jordan"])
+        - "MENA region including Syria, Jordan, Lebanon" → ["Syria", "Jordan", "Lebanon", "Middle East and North Africa"]"""
     )
 
     llm_nexus: List[Literal["humanitarian", "development"]] = dspy.OutputField(
         desc="""Categorize project approach. REFUGEE PROJECTS typically require BOTH categories.
 
-        "humanitarian": Emergency response, protection, immediate assistance, crisis response, PSEA, emergency health
+        "humanitarian": Emergency response, protection, immediate assistance, crisis response, PSEA, emergency health, COVID emergency response
         "development": Capacity building, infrastructure, institutional strengthening, long-term solutions, education systems
+
+        SPECIAL CASES:
+        - Administrative work with "GLIDE: (COVID-19)" tags → include "humanitarian" (emergency response context)
+        - Budget projects without clear beneficiaries or context → []
 
         CRITICAL - Use BOTH ["humanitarian", "development"] when:
         - Refugee protection + capacity building
         - UNRWA projects (always both)
         - UNICEF refugee work (typically both)
         - Projects combining immediate assistance with institutional strengthening
-        - Child protection + system development
 
         EXAMPLES:
         - "Protection from Sexual Exploitation + strengthening social protection systems" → ["humanitarian", "development"]
         - "UNICEF child abuse reporting system" → ["humanitarian", "development"]
-        - "Administrative costs only" → []
-        - "Water infrastructure program" → ["development"]
-        - "Emergency energy toolkit" → ["humanitarian"]
-
-        Single category only if CLEARLY just one type. Empty list [] if unclear."""
+        - "Administrative costs" + "GLIDE: (COVID-19)" → ["humanitarian"]
+        - "2020Programme Budget" with no COVID context → []
+        - "Water infrastructure program" → ["development"]"""
     )
 
     llm_funding_org: List[str] = dspy.OutputField(
-        desc="""List ALL organizations providing funding, using EXACT names from text.
+        desc="""List organizations providing funding. Look carefully in description text for funding mentions.
 
-        Search in ALL narrative fields for funding sources. Include ALL name variations:
-        - Full names AND abbreviations if both mentioned
-        - Different language versions if provided
-        - Government departments and agencies
+        SEARCH STRATEGIES:
+        - Look for: "funded by", "financed by", "provided by", "support from", "Ko-Finanzierung"
+        - Check descriptions for co-financing: "Ko-Finanzierung EU", "Neighbourhood Investment Plattform (NIP)"
+        - Transaction providers are often funders
+        - Reporting org may also be a funder
+
+        CRITICAL RULES:
+        - Include abbreviated forms mentioned: if text says "GEF" include both "Global Environment Facility" and "GEF"
+        - Look for co-financing: "Ko-Finanzierung EU" means EU is a funder
+        - Extract from titles: "JHF-OCHA funded project" → "Jordan Humanitarian Fund"
+        - Don't duplicate same organization with slightly different names
 
         EXAMPLES:
-        - "Jordan Humanitarian Fund", "United Nations Office for the Coordination of Humanitarian Affairs" → ["Jordan Humanitarian Fund", "United Nations Office for the Coordination of Humanitarian Affairs"]
-        - "Sweden" + "Swedish International Development Cooperation Agency" → ["Sweden", "Swedish International Development Cooperation Agency"]
-        - "U.S. Agency for International Development" + "Department of State" → ["U.S. Agency for International Development", "Department of State"]
-        - "BMZ" + "Federal Ministry for Economic Cooperation and Development" → ["Bundesministerium für wirtschaftliche Zusammenarbeit und Entwicklung (BMZ)", "Federal Ministry for Economic Cooperation and Development (BMZ)"]
-
-        Look especially in: transaction_provider_org_narrative, participating_org_narrative, description text.
-        Empty list [] only if NO funding sources mentioned."""
+        - "25 Mio. EUR aus Mitteln der Neighbourhood Investment Plattform (NIP) (Ko-Finanzierung EU)" → include "EU"
+        - "Jordan Humanitarian Fund" + "United Nations Office for the Coordination of Humanitarian Affairs" → both funders
+        - "Development and Employment Fund (DEF) who will be considered the project donor" → include "Development and Employment Fund"
+        - "GEF" in transactions → include both "Global Environment Facility" and "GEF" """
     )
 
     llm_implementing_org: List[str] = dspy.OutputField(
-        desc="""List ALL organizations carrying out activities, using EXACT names from text.
+        desc="""List organizations carrying out activities. Look in titles, descriptions, transaction receivers, and participating orgs.
 
-        Include ALL implementing partners mentioned:
-        - Primary implementers and sub-contractors
-        - Government ministries/agencies if implementing
-        - NGOs, UN agencies, private companies
-        - Multiple partners if mentioned
+        EXTRACTION RULES:
+        - Extract from titles: "ICRC 1999 Jordan" → include "ICRC"
+        - Look for: "implemented by", "carried out by", "piloted in", government partners
+        - Government ministries mentioned as partners are implementers
+        - Transaction receivers are often implementers
+        - Organizations mentioned as delivering services
 
         EXAMPLES:
-        - "INTERSOS" + "UNRWA" + "NGOs" → ["INTERSOS", "UNRWA", "NGOs"]
-        - "U.S. Agency for International Development" + "Invitational Travelers - USAID" → ["U.S. Agency for International Development", "Invitational Travelers - USAID"]
-        - "International Labour Organization (ILO)" + "Development and Employment Fund" → ["International Labour Organization (ILO)", "Development and Employment Fund", "Vocational Training Corporation (VTC)"]
-
-        Look especially in: transaction_receiver_org_narrative, participating_org_narrative, description text for "implemented by", "carried out by", partner organizations.
-        
-        Include the reporting organization if they're also implementing (not just reporting)."""
+        - "ICRC 1999 Jordan" title → ["ICRC"]
+        - "support the Jordanian Ministry of Education reform program" → ["Jordanian Ministry of Education", "International Relief and Development"]
+        - "at UNRWA centres and NGOs" → ["UNRWA", "NGOs"]
+        - "DEF will pilot the KAB programme in the VTC" → ["Development and Employment Fund", "Vocational Training Corporation"]
+        - "INTERSOS will focus on strengthening CBO social protection systems" → ["INTERSOS"]
+        - Include exact names: "unrwa" and "United Nations Relief and Works Agency" both if mentioned"""
     )
 
 
