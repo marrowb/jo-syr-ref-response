@@ -1,12 +1,15 @@
 import os
 import sys
 from datetime import datetime
+from pathlib import Path
+import asyncio
 
 import dspy
 
 from definitions import DSPY_CONFIG, GEMINI_API_KEY, NARRATIVE_FIELDS, ROOT_DIR
 from lib.dspy_classifier import generate_labels, smart_sample
 from lib.dspy_optimizer import prepare_examples, train_model
+from lib.dspy_batch_classify import label_all_activities_async
 from lib.util_file import read_json, write_json
 from lib.util_mlfow import MLflowServerManager, setup_mlflow_tracking
 
@@ -83,6 +86,59 @@ def label_all_activities(model) -> None:
     )
 
 
+def load_saved_model(model_path: str):
+    """Load a saved DSPy model from JSON format."""
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model not found: {model_path}")
+    
+    from lib.dspy_classifier import IATIClassifier
+    classifier = dspy.ChainOfThought(IATIClassifier)
+    classifier.load(model_path)
+    return classifier
+
+
+async def batch_classify(model_path: str = None, num_activities: int = None, batch_size: int = 50):
+    """Run batch classification with timestamp-based output folder."""
+    
+    # Create timestamped output directory
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_dir = Path(ROOT_DIR) / "data" / "iati" / "batch-classify" / timestamp
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Load model
+    if model_path:
+        model = load_saved_model(model_path)
+        print(f"Loaded model from: {model_path}")
+    else:
+        # Train new model
+        labeled_data = read_json(os.path.join(ROOT_DIR, "data", "iati", "model", "jordan_activities_labeled.json"))
+        examples = prepare_examples(labeled_data)
+        model = train_model(examples)
+        print("Trained new model")
+    
+    # Prepare input data
+    activities_path = os.path.join(ROOT_DIR, "data", "iati", "jordan_activities_narratives.json")
+    activities = read_json(activities_path)
+    
+    if num_activities:
+        activities = activities[:num_activities]
+        print(f"Processing subset: {num_activities} activities")
+    
+    # Create subset file in output directory
+    subset_path = output_dir / "input_activities.json"
+    write_json(activities, str(subset_path))
+    
+    # Run classification with custom paths
+    await label_all_activities_async(
+        model=model, 
+        input_path=str(subset_path), 
+        output_dir=str(output_dir), 
+        batch_size=batch_size
+    )
+    
+    print(f"Results saved to: {output_dir}")
+
+
 def main():
     """Main execution pipeline."""
     print("Starting DSPy Model Pipeline...")
@@ -98,11 +154,16 @@ def main():
     setup_mlflow_tracking("dspy-aid-activity-classification")
     setup_dspy_config()
 
-    # 3. Depending on what stage of model training you're at
-    # Comment one of these out
-
+    # 3. Choose operation:
     # build_sample_for_labeling()
-    train_classification_model()
+    # train_classification_model()
+    
+    # Test with 100 activities, batch size 50
+    asyncio.run(batch_classify(
+        model_path="models/aid_classifier_75_2024-12-19_14:30:15.json",  # Your model path
+        num_activities=100,
+        batch_size=50
+    ))
 
 
 if __name__ == "__main__":

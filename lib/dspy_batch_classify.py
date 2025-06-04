@@ -7,18 +7,21 @@ from definitions import NARRATIVE_FIELDS, ROOT_DIR
 from lib.util_file import read_json, write_json
 
 
-async def label_all_activities_async(model, batch_size: int = 50) -> None:
-    """Robust async labeling with progress tracking and error handling."""
+async def label_all_activities_async(model, input_path: str = None, output_dir: str = None, batch_size: int = 50) -> None:
+    """Robust async labeling with custom paths."""
     
-    # Paths
-    base_path = Path(ROOT_DIR) / "data" / "iati"
-    activities_path = base_path / "jordan_activities_narratives.json"
-    output_path = base_path / "all_activities_classified.json"
-    progress_path = base_path / "progress.json"
-    errors_path = base_path / "errors.json"
+    # Use custom paths or defaults
+    if not input_path:
+        input_path = str(Path(ROOT_DIR) / "data" / "iati" / "jordan_activities_narratives.json")
+    if not output_dir:
+        output_dir = str(Path(ROOT_DIR) / "data" / "iati")
+    
+    output_path = Path(output_dir) / "classified_results.json"
+    progress_path = Path(output_dir) / "progress.json"
+    errors_path = Path(output_dir) / "errors.json"
     
     # Load and filter
-    activities = read_json(str(activities_path))
+    activities = read_json(input_path)
     progress = read_json(str(progress_path)) if progress_path.exists() else {"done": []}
     remaining = [a for a in activities if a.get("iati_identifier") not in progress["done"]]
     
