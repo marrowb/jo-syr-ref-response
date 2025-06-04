@@ -13,68 +13,81 @@ async def label_all_activities_async(
     output_dir: str = None,
     batch_size: int = 50,
 ) -> None:
-    """Robust async labeling with custom paths."""
-    # TODO
-    # Add a master classified list in iati/data
-    # Create ids for the results based on being unique dicts
-
-    # Use custom paths or defaults
-    if not input_path:
-        input_path = str(
-            Path(ROOT_DIR) / "data" / "iati" / "jordan_activities_narratives.json"
-        )
+    """Robust async labeling with master progress tracking and retry logic."""
+    
+    # Master progress file in main data directory
+    master_progress_path = Path(ROOT_DIR) / "data" / "iati" / "master_classification_progress.json"
+    
+    # Local output paths
     if not output_dir:
         output_dir = str(Path(ROOT_DIR) / "data" / "iati")
-
+    
     output_path = Path(output_dir) / "classified_results.json"
-    progress_path = Path(output_dir) / "progress.json"
     errors_path = Path(output_dir) / "errors.json"
-
-    # Load and filter
-    progress = read_json(str(progress_path)) if progress_path.exists() else {"done": []}
-    remaining = [
-        a for a in activities if a.get("iati_identifier") not in progress["done"]
-    ]
-
+    
+    # Load master progress using unique_id
+    master_progress = read_json(str(master_progress_path)) if master_progress_path.exists() else {"done": set()}
+    if isinstance(master_progress["done"], list):
+        master_progress["done"] = set(master_progress["done"])
+    
+    # Filter using unique_id instead of iati_identifier
+    remaining = [a for a in activities if a.get("unique_id") not in master_progress["done"]]
+    
     print(f"Processing {len(remaining)}/{len(activities)} activities")
-
-    # Process batches with conservative rate limiting
-    semaphore = asyncio.Semaphore(10)  # Much lower concurrency
-
-    for i in range(0, len(remaining), batch_size):
-        batch = remaining[i : i + batch_size]
-
-        # Concurrent classification
-        tasks = [_classify_activity(model, activity, semaphore) for activity in batch]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        # Filter successful results
-        successful = []
-        errors = []
-        for activity, result in zip(batch, results):
-            if isinstance(result, Exception):
-                error = {"id": activity.get("iati_identifier"), "error": str(result)}
-                errors.append(error)
-                print(f"Error: {error}")
-            elif _validate_result(result):
-                successful.append(result)
-                progress["done"].append(activity.get("iati_identifier"))
-            else:
-                error = {
-                    "id": activity.get("iati_identifier"),
-                    "error": "Invalid result format",
-                }
-                errors.append(error)
-                print(f"Invalid result: {error}")
-
-        # Save progress atomically
-        _append_results(successful, output_path)
-        if errors:
-            _append_results(errors, errors_path)
-        _save_progress(progress, progress_path)
-
-        print(f"Batch {i//batch_size + 1}: {len(successful)}/{len(batch)} successful")
-        await asyncio.sleep(2.0)  # Longer pause between batches
+    
+    # Retry loop until all activities are classified
+    max_retries = 3
+    retry_count = 0
+    
+    while remaining and retry_count < max_retries:
+        print(f"Retry attempt {retry_count + 1}/{max_retries}")
+        
+        semaphore = asyncio.Semaphore(10)
+        
+        for i in range(0, len(remaining), batch_size):
+            batch = remaining[i:i + batch_size]
+            
+            tasks = [_classify_activity(model, activity, semaphore) for activity in batch]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            successful = []
+            errors = []
+            
+            for activity, result in zip(batch, results):
+                if isinstance(result, Exception):
+                    error = {"unique_id": activity.get("unique_id"), "error": str(result)}
+                    errors.append(error)
+                elif _validate_result(result):
+                    successful.append(result)
+                    master_progress["done"].add(activity.get("unique_id"))
+                else:
+                    error = {"unique_id": activity.get("unique_id"), "error": "Invalid result format"}
+                    errors.append(error)
+            
+            # Save results and update master progress
+            _append_results(successful, output_path)
+            if errors:
+                _append_results(errors, errors_path)
+            
+            # Save master progress (convert set to list for JSON)
+            master_progress_save = {"done": list(master_progress["done"]), "last_updated": datetime.now().isoformat()}
+            write_json(master_progress_save, str(master_progress_path))
+            
+            print(f"Batch {i//batch_size + 1}: {len(successful)}/{len(batch)} successful")
+            await asyncio.sleep(2.0)
+        
+        # Update remaining list for next retry
+        remaining = [a for a in activities if a.get("unique_id") not in master_progress["done"]]
+        retry_count += 1
+    
+    # Final validation
+    final_remaining = [a for a in activities if a.get("unique_id") not in master_progress["done"]]
+    if final_remaining:
+        print(f"WARNING: {len(final_remaining)} activities still unclassified after {max_retries} retries")
+        unclassified_ids = [a.get("unique_id") for a in final_remaining]
+        write_json({"unclassified_ids": unclassified_ids}, str(Path(output_dir) / "unclassified.json"))
+    else:
+        print("✅ All activities successfully classified!")
 
 
 async def _classify_activity(model, activity, semaphore):
@@ -131,7 +144,3 @@ def _append_results(results, output_path):
     write_json(existing, str(output_path))
 
 
-def _save_progress(progress, progress_path):
-    """Atomic progress save."""
-    progress["last_updated"] = datetime.now().isoformat()
-    write_json(progress, str(progress_path))
