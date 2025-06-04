@@ -137,101 +137,155 @@ class IATIClassifier(dspy.Signature):
             "mixed_or_unspecified_refugees",
         ]
     ] = dspy.OutputField(
-        desc="""CRITICAL: Identify refugee nationalities ONLY when refugees are explicitly mentioned as BENEFICIARIES or TARGET POPULATION of the aid program.
+        desc="""CRITICAL: Identify refugee nationalities ONLY when refugees are explicitly mentioned as BENEFICIARIES or TARGET POPULATION.
 
         Use specific nationalities ("Syria", "Palestine", "Iraq", "Yemen", "Sudan") ONLY when:
-        - Program explicitly targets/serves refugees from these countries
-        - "Syrian refugees", "Palestinian refugees", etc. are mentioned as beneficiaries
+        - Text explicitly mentions "Syrian refugees", "Palestinian refugees", etc. as beneficiaries
         - Activities are designed specifically for these refugee populations
 
         Use "Other" ONLY when:
-        - Program explicitly targets refugees from countries not listed (e.g., "Somali refugees", "Sudanese refugees")
-        - Must be clear they are beneficiaries, not just mentioned
+        - Text explicitly mentions refugees from other countries as beneficiaries (e.g., "Somali refugees")
 
         Use "mixed_or_unspecified_refugees" ONLY when:
-        - Program explicitly targets "refugees" as beneficiaries but nationality is not specified
-        - Multiple refugee groups are targeted but not individually identifiable
-        - "refugee populations", "refugee beneficiaries" without nationality breakdown
-        - Activity is conducted by UNHCR or UNOCHA and no detailed description is given
+        - Text mentions "refugees" as beneficiaries but nationality not specified
+        - UNHCR/UNRWA projects with refugee focus but no nationality breakdown
 
-        DO NOT use any values if:
-        - Refugees are only mentioned in context/background
-        - Program is about refugee coordination/management without direct service
-        - Activities happen in refugee areas but don't target refugees as beneficiaries
-        - General capacity building that may indirectly affect refugees
+        EXAMPLES:
+        - "Protection from Sexual Exploitation targeting Syrian refugees and host communities" → ["Syria"]
+        - "UNICEF child abuse reporting system at UNRWA centres" → ["Palestine"] (UNRWA serves Palestinians)
+        - "Energy toolkit responsive to women and girls needs in refugee settings" → ["mixed_or_unspecified_refugees"]
+        - "Administrative costs and operating expenses" → [] (no refugees targeted)
 
-        Empty list [] if no refugees are explicitly targeted as beneficiaries. Be very conservative - targeting must be explicit and clear."""
+        Empty list [] if refugees not explicitly targeted as beneficiaries."""
     )
 
     llm_target_population: List[
         Literal["refugees", "host_communities", "general_population"]
     ] = dspy.OutputField(
-        desc="""CRITICAL: Identify populations that are EXPLICITLY and DIRECTLY TARGETED as BENEFICIARIES of the aid program's activities and services. The program must be designed TO SERVE or PROVIDE DIRECT ASSISTANCE TO these populations.
+        desc="""CRITICAL: Identify populations that DIRECTLY RECEIVE project services. Be extremely conservative.
 
-        IMPORTANT DISTINCTION: Do NOT include a population if they are only mentioned as a contextual factor, a reason for the project, or an indirect/potential beneficiary. Focus on who the project's services are DELIVERED TO.
+        "refugees": ONLY when text explicitly states refugees receive direct services
+        - REQUIRED phrases: "assistance to refugees", "services for refugees", "refugee beneficiaries", "targeting refugees"
+        - UNRWA projects automatically include refugees (they serve Palestinians)
+        - UNHCR projects typically serve refugees
 
-        "refugees": ONLY when the project explicitly states it TARGETS, SERVES, PROVIDES ASSISTANCE TO, or directly BENEFITS refugees as primary beneficiaries.
-        - Examples: "assistance to Syrian refugees", "education services for refugee children", "livelihood support for refugee families".
-        - If a project aims to "improve infrastructure in areas with high refugee populations," this alone does NOT mean "refugees" are the target population unless the infrastructure is specifically FOR refugees or refugees receive distinct access/services. The target might be "host_communities" or "general_population" of that area.
+        "host_communities": ONLY when text explicitly mentions serving local/host populations distinctly
+        - REQUIRED phrases: "host community support", "vulnerable Jordanians", "host populations"
 
-        DO NOT use "refugees" if:
-        - Refugees are mentioned as a cause of a problem the project addresses for a broader community. Example: A project description states, "The influx of refugees has strained local water resources. This project will upgrade the municipal water system." Here, the direct beneficiaries are the users of the municipal water system (likely "general_population" or "host_communities"), NOT "refugees," unless refugees are explicitly stated to receive distinct water services from this project.
-        - The project is about general capacity building (e.g., for a government ministry) that might indirectly benefit refugees among others, but does not provide direct services TO refugees.
+        "general_population": ONLY for projects serving broader population without refugee distinction
+        - National programs, public infrastructure, general services
 
-        "host_communities": ONLY when the project explicitly targets or provides distinct services to local/host populations specifically because they are affected by or are hosting refugees.
-        - Examples: "support for vulnerable Jordanians in refugee-hosting areas", "services for host community members to mitigate impact of refugee presence".
-        - If a project benefits an entire area that happens to host refugees (e.g., improving a public school for all children in a district), use "general_population" for that district, and add "host_communities" ONLY if host community children/families receive *additional or specific* support beyond the general improvements.
+        AUTOMATIC EMPTY LIST [] for:
+        - Administrative projects ("Administration", "Operations", "Miscellaneous", "Travel", "Oversight")
+        - Unclear or vague descriptions
+        - Projects mentioning refugees only as context, not beneficiaries
 
-        "general_population": ONLY when the project targets the broader population of an area (national, regional, or local) without a distinct, primary focus on refugees or host communities as separate beneficiary groups receiving differentiated services.
-        - Examples: "national health campaign for all Jordanians", "improving public infrastructure for all residents of Amman".
-        - If a project targets "all residents of Mafraq Governorate," and Mafraq hosts refugees, the target is still "general_population" of Mafraq, unless refugees or host communities within Mafraq are explicitly singled out for different or additional services.
-
-        Multiple values are allowed ONLY if the program explicitly states it targets multiple groups with distinct or comprehensive services for each.
-        If targeting is unclear, ambiguous, or if a group is only mentioned contextually (as a driver of the problem rather than a direct recipient of the solution), DO NOT include them. Be very conservative. Focus on WHO RECEIVES the project's outputs/services directly.
-        """
+        EXAMPLES:
+        - "Protection targeting Syrian refugees and host communities" → ["refugees", "host_communities"]
+        - "UNICEF child abuse reporting at UNRWA centres" → ["refugees"] (UNRWA serves refugees)
+        - "Administrative costs and operating expenses" → []
+        - "Red Cross activities in Jordan" (no beneficiary details) → []
+        - "Energy toolkit for women and girls in refugee settings" → ["refugees"]"""
     )
 
     llm_ref_setting: List[Literal["camp", "urban", "rural"]] = dspy.OutputField(
-        desc="""CRITICAL: Identify the SPECIFIC physical setting(s) where project activities are EXPLICITLY STATED to take place. Vague references or broad administrative areas (like a governorate) are NOT sufficient unless they are the most specific detail provided and inherently imply a setting (e.g., "agricultural activities in X governorate" implies rural).
+        desc="""Identify ALL physical settings where activities occur. MULTIPLE values required for multi-location projects.
 
-        "camp": ONLY when activities explicitly occur IN or are delivered directly TO RECIPIENTS IN refugee camps.
-        - Look for: Named camps ("Za'atari camp", "Azraq camp", "EJC / Emirati Jordanian Camp"), or phrases like "in refugee camps", "camp-based activities", "services within the camps".
-        - If a location like "Azraq" is mentioned, and the activity clearly targets refugees or involves camp-like services, "camp" is appropriate. If "Azraq" refers to the town for general population activities, it would be "urban".
+        "camp": Any mention of refugee camps, named camps (Za'atari, Azraq, EJC, etc.), "camp settings"
+        "urban": Cities, towns, urban areas, municipal services
+        "rural": Villages, rural communities, agricultural areas
 
-        "urban": ONLY when activities explicitly occur in cities, towns, or clearly municipal settings.
-        - Look for: Named cities/towns ("Amman", "Irbid city", "Zarqa town"), or phrases like "urban areas", "city centers", "municipal services".
-        - Distinguish from broader governorates. "Mafraq Governorate" is not "urban" unless activities are specified in "Mafraq city".
+        CRITICAL - INCLUDE MULTIPLE SETTINGS when:
+        - "throughout Jordan", "across the country", "six governorates" → likely ["urban", "rural", "camp"]
+        - "all across the country through six governorates" → ["urban", "rural", "camp"]
+        - Multiple governorates mentioned → likely ["urban", "rural"]
+        - National scope projects → typically ["urban", "rural"]
 
-        "rural": ONLY when activities explicitly occur in rural, countryside, agricultural, or non-urban village areas.
-        - Look for: Phrases like "rural areas/communities", "villages", "agricultural lands", "pastoral areas", "desert communities" (if distinct from urban centers).
-        - Example: "Support to farming communities in Balqa Governorate" would imply "rural".
+        EXAMPLES:
+        - "targeting six governorates of Irbid, Madaba, Amman, Karak, Ma'an and Tafileh" → ["urban", "rural", "camp"]
+        - "Primary Health Care in Jordan" → ["urban", "rural"]
+        - "activities at UNRWA centres and NGOs" → ["camp", "urban"]
+        - "Amman" only → ["urban"]
 
-        Multiple values are allowed ONLY if activities explicitly and clearly span multiple distinct settings (e.g., "services in Azraq camp and Irbid city").
-
-        DO NOT infer setting from:
-        - Governorate names *alone* if the activity type doesn't inherently imply a setting (e.g., "meetings in Mafraq Governorate" is not specific enough).
-        - Organization types (e.g., UNHCR's presence doesn't automatically mean "camp").
-        - General geographic references like "northern Jordan" if no more specific setting is provided.
-
-        If the setting is not explicitly stated, is too broad (e.g., just "Jordan" with no further detail for a non-national project), or if a project has a "national" geographic focus without specifying types of settings (e.g. "urban clinics nationwide"), use an empty list []. Be conservative.
-        If a project is described as "nationwide training workshops," and no specific settings like "urban centers" or "rural schools" are mentioned, the setting list should be empty.
-        """
+        Empty list [] only if NO geographic details provided."""
     )
 
     llm_geographic_focus: List[str] = dspy.OutputField(
-        desc="""To list specific sub-national administrative areas, cities, or regions within the host country (e.g., Jordan) that are explicitly mentioned in the narrative as locations for project activities. Extracted names of locations (e.g., "Amman", "Zarka", "Irbid", "Mafraq governorate", "northern Jordan"). The value "national" can be used if the project is explicitly described as having a nationwide scope. If only the country name (e.g., "Jordan") is mentioned without further sub-national detail, and the scope isn't explicitly "national", then the country name can be used. If no specific sub-national locations, "national" scope, or country-level mention is present, this field should be an empty list []."""
+        desc="""List specific locations mentioned, using EXACT names from text.
+
+        Include:
+        - Governorates: "Irbid", "Madaba", "Amman", "Karak", "Ma'an", "Tafileh", "Al Karak", "Al Tafilah"
+        - Cities: "Amman", "Washington DC", "Stockholm", etc.
+        - Regions: "Middle East and North Africa", "northern Jordan"
+        - Countries: "Jordan", "Ukraine", etc.
+        - Use "national" if explicitly described as nationwide scope
+
+        EXTRACT ALL mentioned locations, not just primary focus.
+
+        EXAMPLES:
+        - "six governorates of Irbid, Madaba, Amman, Karak, Ma'an and Tafileh" → ["Irbid", "Madaba", "Amman", "Karak", "Ma'an", "Tafileh"]
+        - "Washington DC, USA/Amman, Jordan" → ["Washington DC", "Amman", "Jordan"]
+        - "throughout Jordan" → ["national"]"""
     )
 
     llm_nexus: List[Literal["humanitarian", "development"]] = dspy.OutputField(
-        desc="""To categorize the project's primary aim(s) along the humanitarian-development spectrum based on its narrative description. Multiple values can be selected if the project clearly and substantially integrates both humanitarian and development objectives and approaches (e.g., ["humanitarian", "development"]). "humanitarian": The project primarily focuses on saving lives, alleviating suffering, and maintaining human dignity during and in the aftermath of crises. It seeks to mitigate harms faced by vulnerable populations in the present. "development": The project primarily focuses on addressing underlying causes of poverty and vulnerability, and building sustainable systems, institutions, and capacities for long-term improvement in quality of life. It seeks to build durable solutions over time. If the nexus is not clearly inferable from the narrative for either category, this field should be an empty list []. If only one aspect is clear, only that tag should be used."""
+        desc="""Categorize project approach. REFUGEE PROJECTS typically require BOTH categories.
+
+        "humanitarian": Emergency response, protection, immediate assistance, crisis response, PSEA, emergency health
+        "development": Capacity building, infrastructure, institutional strengthening, long-term solutions, education systems
+
+        CRITICAL - Use BOTH ["humanitarian", "development"] when:
+        - Refugee protection + capacity building
+        - UNRWA projects (always both)
+        - UNICEF refugee work (typically both)
+        - Projects combining immediate assistance with institutional strengthening
+        - Child protection + system development
+
+        EXAMPLES:
+        - "Protection from Sexual Exploitation + strengthening social protection systems" → ["humanitarian", "development"]
+        - "UNICEF child abuse reporting system" → ["humanitarian", "development"]
+        - "Administrative costs only" → []
+        - "Water infrastructure program" → ["development"]
+        - "Emergency energy toolkit" → ["humanitarian"]
+
+        Single category only if CLEARLY just one type. Empty list [] if unclear."""
     )
 
     llm_funding_org: List[str] = dspy.OutputField(
-        desc="""To list the names of organizations explicitly mentioned in the narrative as providing financial resources (donors) for the project. Names of organizations as they appear in the narrative (e.g., "US Department of Labor", "DFID", "UNICEF"). If no funding organizations are clearly mentioned in the narrative, this field should be an empty list []."""
+        desc="""List ALL organizations providing funding, using EXACT names from text.
+
+        Search in ALL narrative fields for funding sources. Include ALL name variations:
+        - Full names AND abbreviations if both mentioned
+        - Different language versions if provided
+        - Government departments and agencies
+
+        EXAMPLES:
+        - "Jordan Humanitarian Fund", "United Nations Office for the Coordination of Humanitarian Affairs" → ["Jordan Humanitarian Fund", "United Nations Office for the Coordination of Humanitarian Affairs"]
+        - "Sweden" + "Swedish International Development Cooperation Agency" → ["Sweden", "Swedish International Development Cooperation Agency"]
+        - "U.S. Agency for International Development" + "Department of State" → ["U.S. Agency for International Development", "Department of State"]
+        - "BMZ" + "Federal Ministry for Economic Cooperation and Development" → ["Bundesministerium für wirtschaftliche Zusammenarbeit und Entwicklung (BMZ)", "Federal Ministry for Economic Cooperation and Development (BMZ)"]
+
+        Look especially in: transaction_provider_org_narrative, participating_org_narrative, description text.
+        Empty list [] only if NO funding sources mentioned."""
     )
 
     llm_implementing_org: List[str] = dspy.OutputField(
-        desc="""To list the names of organizations explicitly mentioned in the narrative as being responsible for carrying out the project activities (implementing partners). Names of organizations as they appear in the narrative (e.g., "ILO", "Mercy Corps", "Ministry of Education"). If no implementing organizations are clearly mentioned in the narrative, this field should be an empty list []."""
+        desc="""List ALL organizations carrying out activities, using EXACT names from text.
+
+        Include ALL implementing partners mentioned:
+        - Primary implementers and sub-contractors
+        - Government ministries/agencies if implementing
+        - NGOs, UN agencies, private companies
+        - Multiple partners if mentioned
+
+        EXAMPLES:
+        - "INTERSOS" + "UNRWA" + "NGOs" → ["INTERSOS", "UNRWA", "NGOs"]
+        - "U.S. Agency for International Development" + "Invitational Travelers - USAID" → ["U.S. Agency for International Development", "Invitational Travelers - USAID"]
+        - "International Labour Organization (ILO)" + "Development and Employment Fund" → ["International Labour Organization (ILO)", "Development and Employment Fund", "Vocational Training Corporation (VTC)"]
+
+        Look especially in: transaction_receiver_org_narrative, participating_org_narrative, description text for "implemented by", "carried out by", partner organizations.
+        
+        Include the reporting organization if they're also implementing (not just reporting)."""
     )
 
 
