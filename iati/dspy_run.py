@@ -60,6 +60,21 @@ def train_classification_model():
 
     return trained_model
 
+def label_all_activities(model) -> None:
+    """Label all activities"""
+    activities_path = os.path.join(ROOT_DIR, "data", "iati", "jordan_activities_narratives.json")
+    activities_data = read_json(activities_path)
+    # Async loops
+    results = []
+    for activity in activities_data:
+        narratives = [activity.get(k) for k in activity.keys() if k in NARRATIVE_FIELDS]
+        pred = model(*narratives)
+        activity_copy = activity.copy()
+#     activity_copy.update({field: getattr(pred, field) for field in
+#                          ['llm_ref_group', 'llm_target_population', etc...]})
+        results.append(activity_copy)
+    write_json(results, os.path.join(ROOT_DIR, "data", "iati", "all_activities_classified.json")
+
 
 def main():
     """Main execution pipeline."""
