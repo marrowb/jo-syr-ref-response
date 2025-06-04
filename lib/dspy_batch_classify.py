@@ -7,9 +7,16 @@ from lib.util_file import read_json, write_json
 
 
 async def label_all_activities_async(
-    model, input_path: str = None, output_dir: str = None, batch_size: int = 50
+    model,
+    activities,
+    input_path: str = None,
+    output_dir: str = None,
+    batch_size: int = 50,
 ) -> None:
     """Robust async labeling with custom paths."""
+    # TODO
+    # Add a master classified list in iati/data
+    # Create ids for the results based on being unique dicts
 
     # Use custom paths or defaults
     if not input_path:
@@ -24,7 +31,6 @@ async def label_all_activities_async(
     errors_path = Path(output_dir) / "errors.json"
 
     # Load and filter
-    activities = read_json(input_path)
     progress = read_json(str(progress_path)) if progress_path.exists() else {"done": []}
     remaining = [
         a for a in activities if a.get("iati_identifier") not in progress["done"]
