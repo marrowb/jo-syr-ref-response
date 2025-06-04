@@ -78,7 +78,9 @@ def load_saved_model(model_path: str):
     return classifier
 
 
-async def batch_classify(model_path, num_activities: int = None, batch_size: int = 50):
+async def batch_classify(
+    model_path, activities, num_activities: int = None, batch_size: int = 50
+):
     """Run batch classification with timestamp-based output folder."""
 
     # Create timestamped output directory
@@ -91,10 +93,11 @@ async def batch_classify(model_path, num_activities: int = None, batch_size: int
     print(f"Loaded model from: {model_path}")
 
     # Prepare input data
-    activities_path = os.path.join(
-        ROOT_DIR, "data", "iati", "jordan_activities_narratives.json"
-    )
-    activities = read_json(activities_path)
+    if not activities:
+        activities_path = os.path.join(
+            ROOT_DIR, "data", "iati", "jordan_activities_narratives.json"
+        )
+        activities = read_json(activities_path)
 
     if num_activities:
         activities = activities[:num_activities]
@@ -107,6 +110,7 @@ async def batch_classify(model_path, num_activities: int = None, batch_size: int
     # Run classification with custom paths
     await label_all_activities_async(
         model=model,
+        activities=activities,
         input_path=str(subset_path),
         output_dir=str(output_dir),
         batch_size=batch_size,
@@ -134,6 +138,10 @@ def main():
     # build_sample_for_labeling()
     # train_classification_model()
 
+    activities = read_json(
+        os.path.join(ROOT_DIR, "data", "iati", "hashed_activities_narratives.json")
+    )
+
     # Test with 100 activities, batch size 50
     model = os.path.join(
         ROOT_DIR,
@@ -147,6 +155,7 @@ def main():
     asyncio.run(
         batch_classify(
             model_path=model,  # Your model path
+            activities=activities,
             batch_size=10,  # Much smaller batches
         )
     )
