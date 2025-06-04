@@ -4,11 +4,12 @@ from datetime import datetime
 
 import dspy
 
-from definitions import DSPY_CONFIG, GEMINI_API_KEY, ROOT_DIR
-from lib.dspy_classifier import smart_sample, generate_labels
-from lib.dspy_optimizer import train_model, prepare_examples
+from definitions import DSPY_CONFIG, GEMINI_API_KEY, NARRATIVE_FIELDS, ROOT_DIR
+from lib.dspy_classifier import generate_labels, smart_sample
+from lib.dspy_optimizer import prepare_examples, train_model
 from lib.util_file import read_json, write_json
-from lib.util_mlfow import setup_mlflow_tracking, MLflowServerManager
+from lib.util_mlfow import MLflowServerManager, setup_mlflow_tracking
+
 
 def setup_dspy_config():
     """Configure DSPy with the specified model."""
@@ -60,9 +61,12 @@ def train_classification_model():
 
     return trained_model
 
+
 def label_all_activities(model) -> None:
     """Label all activities"""
-    activities_path = os.path.join(ROOT_DIR, "data", "iati", "jordan_activities_narratives.json")
+    activities_path = os.path.join(
+        ROOT_DIR, "data", "iati", "jordan_activities_narratives.json"
+    )
     activities_data = read_json(activities_path)
     # Async loops
     results = []
@@ -70,10 +74,13 @@ def label_all_activities(model) -> None:
         narratives = [activity.get(k) for k in activity.keys() if k in NARRATIVE_FIELDS]
         pred = model(*narratives)
         activity_copy = activity.copy()
-#     activity_copy.update({field: getattr(pred, field) for field in
-#                          ['llm_ref_group', 'llm_target_population', etc...]})
+        #     activity_copy.update({field: getattr(pred, field) for field in
+        #                          ['llm_ref_group', 'llm_target_population', etc...]})
         results.append(activity_copy)
-    write_json(results, os.path.join(ROOT_DIR, "data", "iati", "all_activities_classified.json")
+    write_json(
+        results,
+        os.path.join(ROOT_DIR, "data", "iati", "all_activities_classified.json"),
+    )
 
 
 def main():
