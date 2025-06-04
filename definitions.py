@@ -1,20 +1,14 @@
 import os
 
 from dotenv import load_dotenv
-from yaml import dump, load
 
-try:
-    from yaml import CDumper as Dumper
-    from yaml import CLoader as Loader
-except ImportError:
-    from yaml import Dumper, Loader
+from lib.util_file import read_json
 
 ROOT_DIR = os.path.realpath(os.path.join(os.path.dirname(__file__), "."))
 load_dotenv(os.path.join(ROOT_DIR, ".env"))
 IATI_API_KEY = os.getenv("IATI_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# DSPy Configuration
 DSPY_CONFIG = {
     "strong_model": "gemini/gemini-2.5-pro-preview-05-06",
     "task_model": "gemini/gemini-2.0-flash",
@@ -29,13 +23,9 @@ RAW_ACTIVITIES = os.path.join(
     ROOT_DIR, "data", "iati", "jordan_activities_all_fields.json"
 )
 
-DATASTORE_SCHEMA_PATH = os.path.join(ROOT_DIR, "reference", "iati", "datastore.yaml")
-
-with open(DATASTORE_SCHEMA_PATH, "r") as f:
-    api_contract = load(f, Loader=Loader)
-    DATASTORE_FIELDS = api_contract["components"]["schemas"][
-        "Query_Response_All_IATI_Fields"
-    ]["properties"]["response"]["properties"]["docs"]["items"]["properties"]
+DATASTORE_FIELDS = read_json(
+    os.path.join(ROOT_DIR, "data", "iati", "datastore_fields.json")
+)
 
 NARRATIVE_FIELDS = [
     field

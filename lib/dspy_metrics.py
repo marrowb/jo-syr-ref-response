@@ -155,14 +155,9 @@ def log_failed_predictions(example, prediction, trace=None) -> None:
     # Only log if there are failures
     if failed_fields:
         # Get all input fields from the example
-        input_fields = {}
-        for attr_name in dir(example):
-            if not attr_name.startswith('_') and attr_name not in fields:
-                value = getattr(example, attr_name, None)
-                # Only include non-callable attributes
-                if not callable(value):
-                    input_fields[attr_name] = value
-        
+        all_inputs = example.inputs().toDict()
+        input_fields = {k:v for k,v in all_inputs.items() if v != '' and v != []}
+
         failed_prediction = {
             "inputs": input_fields,
             "failed": failed_fields

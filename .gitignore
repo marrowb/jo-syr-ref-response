@@ -7,3 +7,5 @@ mlrun/
 *.sqlite
 archive/
 bak/
+reference/
+data/

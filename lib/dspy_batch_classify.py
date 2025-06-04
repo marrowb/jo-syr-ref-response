@@ -1,42 +1,47 @@
 import asyncio
-import json
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 from definitions import NARRATIVE_FIELDS, ROOT_DIR
 from lib.util_file import read_json, write_json
 
 
-async def label_all_activities_async(model, input_path: str = None, output_dir: str = None, batch_size: int = 50) -> None:
+async def label_all_activities_async(
+    model, input_path: str = None, output_dir: str = None, batch_size: int = 50
+) -> None:
     """Robust async labeling with custom paths."""
-    
+
     # Use custom paths or defaults
     if not input_path:
-        input_path = str(Path(ROOT_DIR) / "data" / "iati" / "jordan_activities_narratives.json")
+        input_path = str(
+            Path(ROOT_DIR) / "data" / "iati" / "jordan_activities_narratives.json"
+        )
     if not output_dir:
         output_dir = str(Path(ROOT_DIR) / "data" / "iati")
-    
+
     output_path = Path(output_dir) / "classified_results.json"
     progress_path = Path(output_dir) / "progress.json"
     errors_path = Path(output_dir) / "errors.json"
-    
+
     # Load and filter
     activities = read_json(input_path)
     progress = read_json(str(progress_path)) if progress_path.exists() else {"done": []}
-    remaining = [a for a in activities if a.get("iati_identifier") not in progress["done"]]
-    
+    remaining = [
+        a for a in activities if a.get("iati_identifier") not in progress["done"]
+    ]
+
     print(f"Processing {len(remaining)}/{len(activities)} activities")
-    
+
     # Process batches
     semaphore = asyncio.Semaphore(60)  # Rate limiting
-    
+
     for i in range(0, len(remaining), batch_size):
-        batch = remaining[i:i + batch_size]
-        
+        batch = remaining[i : i + batch_size]
+
         # Concurrent classification
         tasks = [_classify_activity(model, activity, semaphore) for activity in batch]
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         # Filter successful results
         successful = []
         errors = []
@@ -49,16 +54,19 @@ async def label_all_activities_async(model, input_path: str = None, output_dir: 
                 successful.append(result)
                 progress["done"].append(activity.get("iati_identifier"))
             else:
-                error = {"id": activity.get("iati_identifier"), "error": "Invalid result format"}
+                error = {
+                    "id": activity.get("iati_identifier"),
+                    "error": "Invalid result format",
+                }
                 errors.append(error)
                 print(f"Invalid result: {error}")
-        
+
         # Save progress atomically
         _append_results(successful, output_path)
         if errors:
             _append_results(errors, errors_path)
         _save_progress(progress, progress_path)
-        
+
         print(f"Batch {i//batch_size + 1}: {len(successful)}/{len(batch)} successful")
         await asyncio.sleep(0.5)
 
@@ -70,17 +78,24 @@ async def _classify_activity(model, activity, semaphore):
             narratives = {field: activity.get(field, "") for field in NARRATIVE_FIELDS}
             # Run model in thread pool since DSPy isn't async
             pred = await asyncio.to_thread(model, **narratives)
-            
+
             result = activity.copy()
-            pred_dict = pred.toDict() if hasattr(pred, 'toDict') else pred.__dict__
-            
-            for field in ['llm_ref_group', 'llm_target_population', 'llm_ref_setting', 
-                         'llm_geographic_focus', 'llm_nexus', 'llm_funding_org', 'llm_implementing_org']:
+            pred_dict = pred.toDict() if hasattr(pred, "toDict") else pred.__dict__
+
+            for field in [
+                "llm_ref_group",
+                "llm_target_population",
+                "llm_ref_setting",
+                "llm_geographic_focus",
+                "llm_nexus",
+                "llm_funding_org",
+                "llm_implementing_org",
+            ]:
                 result[field] = pred_dict.get(field, [])
-            
+
             result["classified_at"] = datetime.now().isoformat()
             return result
-            
+
         except Exception as e:
             raise Exception(f"Classification failed: {str(e)}")
 
@@ -89,8 +104,15 @@ def _validate_result(result):
     """Ensure all classification fields exist as lists."""
     if not isinstance(result, dict):
         return False
-    required = ['llm_ref_group', 'llm_target_population', 'llm_ref_setting', 
-               'llm_geographic_focus', 'llm_nexus', 'llm_funding_org', 'llm_implementing_org']
+    required = [
+        "llm_ref_group",
+        "llm_target_population",
+        "llm_ref_setting",
+        "llm_geographic_focus",
+        "llm_nexus",
+        "llm_funding_org",
+        "llm_implementing_org",
+    ]
     return all(isinstance(result.get(field), list) for field in required)
 
 
