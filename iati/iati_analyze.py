@@ -97,14 +97,11 @@ def build_transaction_rows(iati_ids: Set) -> pd.DataFrame:
     rows.append(header)
     with open(data_path, "rb") as f:
         j = bigjson.load(f)
-        i = 0
         for _obj in j:
             if _obj["iati_identifier"] in iati_ids:
-                print(f"Processing object number {i}")
                 data = extract_transactions_from_activity_json(_obj)
                 if data:
                     rows.append(data)
-                    i += 1
 
     embed(banner1="Got all Transactions")
     return rows
