@@ -9,7 +9,7 @@ from definitions import ROOT_DIR
 from definitions import TRANSACTION_FIELDS
 from lib.util_file import read_json
 from lib.util_pandas import show_text_wrapped
-from typing import List, Tuple, Dict, Any, Optional
+from typing import List, Set, Tuple, Dict, Any, Optional
 
 
 def load_data():
@@ -83,7 +83,7 @@ def extract_transactions_from_activity_json(
     return transactions
 
 
-def build_transaction_rows(iati_ids: List) -> pd.DataFrame:
+def build_transaction_rows(iati_ids: Set) -> pd.DataFrame:
     """Retrieve all the transactions for the given activities"""
     data_path = os.path.join(
         ROOT_DIR,
@@ -93,14 +93,18 @@ def build_transaction_rows(iati_ids: List) -> pd.DataFrame:
     )
 
     rows = []
-    rows.append(["iati_identifier"].extend(TRANSACTION_FIELDS))
+    header = ["iati_identifier"] + TRANSACTION_FIELDS
+    rows.append(header)
     with open(data_path, "rb") as f:
         j = bigjson.load(f)
+        i = 0
         for _obj in j:
             if _obj["iati_identifier"] in iati_ids:
+                print(f"Processing object number {i}")
                 data = extract_transactions_from_activity_json(_obj)
                 if data:
                     rows.append(data)
+                    i += 1
 
     embed(banner1="Got all Transactions")
     return rows
@@ -110,7 +114,7 @@ def main():
     df = load_data()
     df = filter_syria_ref_activities(df)
     df = filter_duplicates(df)
-    iati_ids = df["iati_identifier"].tolist()
+    iati_ids = set(df["iati_identifier"].tolist())
     rows = build_transaction_rows(iati_ids)
 
     embed(banner1="End of Main")
