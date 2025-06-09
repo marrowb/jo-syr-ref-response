@@ -2,7 +2,7 @@ import os
 import random
 from IPython import embed
 
-import bigjson
+import ijson
 import pandas as pd
 
 from definitions import ROOT_DIR
@@ -95,16 +95,20 @@ def build_transaction_rows(iati_ids: Set) -> pd.DataFrame:
     rows = []
     header = ["iati_identifier"] + TRANSACTION_FIELDS
     rows.append(header)
+    
     with open(data_path, "rb") as f:
-        j = bigjson.load(f)
-        for _obj in j:
+        # Use ijson to stream parse the JSON array
+        objects = ijson.items(f, 'item')
+        for _obj in objects:
             if _obj["iati_identifier"] in iati_ids:
                 data = extract_transactions_from_activity_json(_obj)
                 if data:
-                    rows.append(data)
+                    rows.extend(data)  # Fixed: use extend instead of append
 
+    # Create DataFrame properly
+    df = pd.DataFrame(rows[1:], columns=rows[0])
     embed(banner1="Got all Transactions")
-    return rows
+    return df
 
 
 def main():
