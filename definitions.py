@@ -33,5 +33,7 @@ NARRATIVE_FIELDS = [
     if "narrative" in field and "xml_lang" not in field
 ]
 
+TRANSACTION_FIELDS = [f for f in DATASTORE_FIELDS if "transaction" in f]
+
 MLFLOW_SERVER_PORT = 5050
 MLFLOW_SERVER_URI = f"http://127.0.0.1:{MLFLOW_SERVER_PORT}"
