@@ -1,4 +1,5 @@
 import os
+import csv
 import random
 from IPython import embed
 
@@ -120,7 +121,7 @@ def main():
     df = filter_duplicates(df)
     iati_ids = df["iati_identifier"].tolist()
     # rows = build_transaction_rows(iati_ids)
-    batch_size = 10
+    batch_size = 100
     batch_ids = iati_ids[:batch_size]
     quoted_ids = ['"' + id + '"' for id in batch_ids]
     or_clause = " OR ".join(quoted_ids)
@@ -131,6 +132,7 @@ def main():
         "wt": "csv",
     }
     response = make_api_request("GET", "/transaction/select", params=query_params)
+    reader = csv.reader(response.text.split("\n"), delimiter=",", escapechar="\\")
 
     embed(banner1="End of Main")
 
