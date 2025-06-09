@@ -115,6 +115,66 @@ def build_transaction_rows(iati_ids: Set) -> pd.DataFrame:
     return df
 
 
+def build_transaction_csv_from_datastore(iati_ids: Set, batch_size: int = 100) -> str:
+    """Build a CSV file of transactions from the IATI Datastore API"""
+    import csv
+    from io import StringIO
+    from lib.iati_datastore_utils import make_api_request
+    
+    output_path = os.path.join(ROOT_DIR, "data", "iati", "transactions.csv")
+    iati_ids_list = list(iati_ids)
+    
+    # Write header first
+    header_written = False
+    
+    with open(output_path, 'w', newline='', encoding='utf-8') as outfile:
+        writer = None
+        
+        for i in range(0, len(iati_ids_list), batch_size):
+            batch_ids = iati_ids_list[i:i+batch_size]
+            print(f"Processing batch {i//batch_size + 1}: {len(batch_ids)} IDs")
+            
+            # Build query
+            quoted_ids = ['"' + id + '"' for id in batch_ids]
+            or_clause = ' OR '.join(quoted_ids)
+            query_string = "iati_identifier:(" + or_clause + ")"
+            
+            query_params = {
+                "q": query_string,
+                "fl": ",".join(["iati_identifier"] + TRANSACTION_FIELDS),
+                "wt": "csv",
+                "rows": 10000  # Large number to get all results in batch
+            }
+            
+            try:
+                response = make_api_request("GET", "/transaction/select", params=query_params)
+                csv_text = response.text
+                
+                # Parse CSV response
+                csv_reader = csv.reader(StringIO(csv_text))
+                rows = list(csv_reader)
+                
+                if not rows:
+                    continue
+                    
+                # Write header only once
+                if not header_written:
+                    writer = csv.writer(outfile)
+                    writer.writerow(rows[0])  # Header row
+                    header_written = True
+                
+                # Write data rows (skip header)
+                if len(rows) > 1:
+                    writer.writerows(rows[1:])
+                    
+            except Exception as e:
+                print(f"Error processing batch {i//batch_size + 1}: {e}")
+                continue
+    
+    print(f"Transaction CSV written to: {output_path}")
+    return output_path
+
+
 def main():
     df = load_data()
     df = filter_syria_ref_activities(df)
