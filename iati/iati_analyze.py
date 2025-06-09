@@ -2,13 +2,14 @@ import os
 import random
 from IPython import embed
 
-import ijson
+import orjson
 import pandas as pd
 
 from definitions import ROOT_DIR
 from definitions import TRANSACTION_FIELDS
 from lib.util_file import read_json
 from lib.util_pandas import show_text_wrapped
+from lib.iati_datastore_utils import query_collection, make_api_request
 from typing import List, Set, Tuple, Dict, Any, Optional
 
 
@@ -67,6 +68,7 @@ def extract_transactions_from_activity_json(
     if (
         len(transaction_lengths) == 0 or len(transaction_lengths) > 1
     ):  # no data or non-uniform data
+        # print(f"Activity {iati_id} had non uniform data: \n {transaction_data}")
         return None
 
     transactions = []
@@ -95,17 +97,18 @@ def build_transaction_rows(iati_ids: Set) -> pd.DataFrame:
     rows = []
     header = ["iati_identifier"] + TRANSACTION_FIELDS
     rows.append(header)
-    
+
     with open(data_path, "rb") as f:
-        # Use ijson to stream parse the JSON array
-        objects = ijson.items(f, 'item')
+        objects = orjson.loads(f.read())
+        i = 0
         for _obj in objects:
             if _obj["iati_identifier"] in iati_ids:
                 data = extract_transactions_from_activity_json(_obj)
                 if data:
-                    rows.extend(data)  # Fixed: use extend instead of append
+                    rows.extend(data)
+                    i += 1
+                    print(f"Processed object {i}")
 
-    # Create DataFrame properly
     df = pd.DataFrame(rows[1:], columns=rows[0])
     embed(banner1="Got all Transactions")
     return df
@@ -115,8 +118,19 @@ def main():
     df = load_data()
     df = filter_syria_ref_activities(df)
     df = filter_duplicates(df)
-    iati_ids = set(df["iati_identifier"].tolist())
-    rows = build_transaction_rows(iati_ids)
+    iati_ids = df["iati_identifier"].tolist()
+    # rows = build_transaction_rows(iati_ids)
+    batch_size = 10
+    batch_ids = iati_ids[:batch_size]
+    quoted_ids = ['"' + id + '"' for id in batch_ids]
+    or_clause = " OR ".join(quoted_ids)
+    query_string = "iati_identifier:(" + or_clause + ")"
+    query_params = {
+        "q": query_string,
+        "fl": ",".join(["iati_identifier"] + TRANSACTION_FIELDS),
+        "wt": "csv",
+    }
+    response = make_api_request("GET", "/transaction/select", params=query_params)
 
     embed(banner1="End of Main")
 
