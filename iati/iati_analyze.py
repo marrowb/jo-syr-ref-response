@@ -206,7 +206,7 @@ def main():
 
     tf = clean_iati_transaction_data("transactions_cleaned.csv", iati_ids)
 
-    convert_all_to_usd(tf)
+    tf = convert_all_to_usd(tf)
 
     embed(banner1="End of Main")
 
