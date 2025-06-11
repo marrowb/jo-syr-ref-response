@@ -10,6 +10,7 @@ from definitions import ROOT_DIR
 from definitions import TRANSACTION_FIELDS
 from lib.util_file import read_json
 from lib.util_pandas import show_text_wrapped
+from lib.util_xr import *
 from lib.iati_datastore_utils import query_collection, make_api_request
 from typing import List, Set, Tuple, Dict, Any, Optional
 
@@ -86,7 +87,7 @@ def extract_transactions_from_activity_json(
     return transactions
 
 
-def build_transaction_rows(iati_ids: Set) -> pd.DataFrame:
+def build_transaction_rows_from_all_activities_json(iati_ids: Set) -> pd.DataFrame:
     """Retrieve all the transactions for the given activities"""
     data_path = os.path.join(
         ROOT_DIR,
@@ -117,82 +118,95 @@ def build_transaction_rows(iati_ids: Set) -> pd.DataFrame:
 
 def build_transaction_csv_from_datastore(iati_ids: Set, batch_size: int = 100) -> str:
     """Build a CSV file of transactions from the IATI Datastore API"""
-    import csv
-    from io import StringIO
-    from lib.iati_datastore_utils import make_api_request
-    
+
     output_path = os.path.join(ROOT_DIR, "data", "iati", "transactions.csv")
     iati_ids_list = list(iati_ids)
-    
+
     # Write header first
     header_written = False
-    
-    with open(output_path, 'w', newline='', encoding='utf-8') as outfile:
+
+    with open(output_path, "w", newline="", encoding="utf-8") as outfile:
         writer = None
-        
+
         for i in range(0, len(iati_ids_list), batch_size):
-            batch_ids = iati_ids_list[i:i+batch_size]
+            batch_ids = iati_ids_list[i : i + batch_size]
             print(f"Processing batch {i//batch_size + 1}: {len(batch_ids)} IDs")
-            
+
             # Build query
             quoted_ids = ['"' + id + '"' for id in batch_ids]
-            or_clause = ' OR '.join(quoted_ids)
+            or_clause = " OR ".join(quoted_ids)
             query_string = "iati_identifier:(" + or_clause + ")"
-            
+
             query_params = {
                 "q": query_string,
-                "fl": ",".join(["iati_identifier"] + TRANSACTION_FIELDS),
+                "fl": ",".join(
+                    ["iati_identifier", "default_currency"] + TRANSACTION_FIELDS
+                ),
                 "wt": "csv",
-                "rows": 10000  # Large number to get all results in batch
+                "rows": 10000,  # Large number to get all results in batch
             }
-            
+
             try:
-                response = make_api_request("GET", "/transaction/select", params=query_params)
+                response = make_api_request(
+                    "GET", "/transaction/select", params=query_params
+                )
                 csv_text = response.text
-                
+
                 # Parse CSV response
-                csv_reader = csv.reader(StringIO(csv_text))
+                # csv_reader = csv.reader(StringIO(csv_text))
+                csv_reader = csv.reader(
+                    response.text.split("\n"), delimiter=",", escapechar="\\"
+                )
                 rows = list(csv_reader)
-                
+
                 if not rows:
                     continue
-                    
+
                 # Write header only once
                 if not header_written:
                     writer = csv.writer(outfile)
                     writer.writerow(rows[0])  # Header row
                     header_written = True
-                
+
                 # Write data rows (skip header)
                 if len(rows) > 1:
                     writer.writerows(rows[1:])
-                    
+
             except Exception as e:
                 print(f"Error processing batch {i//batch_size + 1}: {e}")
                 continue
-    
+
     print(f"Transaction CSV written to: {output_path}")
     return output_path
+
+
+def clean_iati_transaction_data(output_filename: str, iati_ids: Set) -> pd.DataFrame:
+    tf = pd.read_csv(os.path.join(ROOT_DIR, "data", "iati", "transactions.csv"))
+    tf = tf[
+        tf["iati_identifier"].isin(iati_ids)
+    ]  # Ensure we keep the transactions for refugee related activities
+    tf["currency"] = tf["transaction_value_currency"].fillna(
+        tf["default_currency"]
+    )  # Use default currency where transaction level currency is unavailable
+
+    tf.to_csv(os.path.join(ROOT_DIR, "data", "iati", output_filename))
+    return tf
 
 
 def main():
     df = load_data()
     df = filter_syria_ref_activities(df)
     df = filter_duplicates(df)
-    iati_ids = df["iati_identifier"].tolist()
-    # rows = build_transaction_rows(iati_ids)
-    batch_size = 100
-    batch_ids = iati_ids[:batch_size]
-    quoted_ids = ['"' + id + '"' for id in batch_ids]
-    or_clause = " OR ".join(quoted_ids)
-    query_string = "iati_identifier:(" + or_clause + ")"
-    query_params = {
-        "q": query_string,
-        "fl": ",".join(["iati_identifier"] + TRANSACTION_FIELDS),
-        "wt": "csv",
-    }
-    response = make_api_request("GET", "/transaction/select", params=query_params)
-    reader = csv.reader(response.text.split("\n"), delimiter=",", escapechar="\\")
+
+    iati_ids = set(df["iati_identifier"].tolist())
+
+    # Uncomment these if you want to rebuild the transactions files
+    # rows = build_transaction_rows_from_all_activities_json(iati_ids)
+    # path = build_transaction_csv_from_datastore(iati_ids)
+
+    tf = clean_iati_transaction_data("transactions_cleaned.csv", iati_ids)
+
+    convert_all_to_usd(tf)
 
     embed(banner1="End of Main")
 
