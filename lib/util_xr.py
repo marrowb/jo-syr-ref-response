@@ -216,16 +216,13 @@ def find_exchange_rates_for_currency(tf_prepared, currency_data, special_rates):
             currency_transactions_sorted["date"] = pd.to_datetime(currency_transactions_sorted["date"])
             rate_data_sorted["date"] = pd.to_datetime(rate_data_sorted["date"])
             
-            # Use merge_asof to find closest rates
-            merged = pd.merge_asof(
+            # Use manual merge instead of merge_asof for reliable nearest date matching
+            merged = manual_nearest_date_merge(
                 currency_transactions_sorted,
                 rate_data_sorted,
-                on="date",
-                direction="nearest",
+                date_col="date",
+                rate_col="rate"
             )
-            
-            # Debug merge results
-            debug_merge_results(currency_transactions_sorted, rate_data_sorted, merged, currency)
 
             # Update exchange rates using the original index
             tf_with_rates.loc[currency_mask, "exchange_rate"] = merged["rate"].values
@@ -250,16 +247,13 @@ def find_exchange_rates_for_currency(tf_prepared, currency_data, special_rates):
             currency_transactions_sorted["date"] = pd.to_datetime(currency_transactions_sorted["date"])
             rate_data_sorted["date"] = pd.to_datetime(rate_data_sorted["date"])
 
-            # Use merge_asof to find closest rates
-            merged = pd.merge_asof(
+            # Use manual merge instead of merge_asof for reliable nearest date matching
+            merged = manual_nearest_date_merge(
                 currency_transactions_sorted,
                 rate_data_sorted,
-                on="date",
-                direction="nearest",
+                date_col="date",
+                rate_col="rate"
             )
-            
-            # Debug merge results
-            debug_merge_results(currency_transactions_sorted, rate_data_sorted, merged, currency)
 
             # Update exchange rates using the original index
             tf_with_rates.loc[currency_mask, "exchange_rate"] = merged["rate"].values
