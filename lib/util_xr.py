@@ -19,7 +19,6 @@ def load_and_prepare_exchange_rates():
     # Get conversion directions from row 3
     conversion_directions = dict(zip(xr.iloc[2], xr.iloc[3]))
     conversion_directions.pop("Currency:", None)
-    embed(banner1="conversion direction codes")
 
     # Set proper column names from row 2 (currency codes)
     xr.columns = xr.iloc[2]
@@ -274,7 +273,6 @@ def convert_all_to_usd(tf: pd.DataFrame):
 
     print("Standardizing exchange rates to usd_per_forex format...")
     standardized_xr = standardize_xr_data_usd_per_forex(xr_data, conversion_directions)
-    embed(banner1="Post xr standardization")
 
     print("Preparing transaction dates...")
     tf_prepared = prepare_transaction_dates(tf)
@@ -291,89 +289,24 @@ def convert_all_to_usd(tf: pd.DataFrame):
     tf_final = apply_currency_conversions(tf_with_rates)
 
     print("Currency conversion complete!")
-    
+
     # Debug exchange rate matching
     print("\nRunning exchange rate debug check...")
     debug_exchange_rate_matching(tf_final, standardized_xr, special_rates, n_samples=5)
-    
+
     return tf_final
 
 
 # Validation Functions
 
 
-def validate_known_conversions():
-    """
-    Test conversion logic with known currency pairs and amounts.
-    """
-    print("=== Validating Known Conversions ===")
-
-    # Test data with known conversions
-    test_cases = [
-        {"amount": 100, "currency": "USD", "expected_usd": 100},
-        {
-            "amount": 100,
-            "currency": "JOD",
-            "rate": JOD_PEGGED_USD,
-            "expected_usd": 100 * JOD_PEGGED_USD,
-        },
-        {
-            "amount": 100,
-            "currency": "SAR",
-            "rate": SAR_PEGGED_USD,
-            "expected_usd": 100 * SAR_PEGGED_USD,
-        },
-    ]
-
-    for case in test_cases:
-        if case["currency"] == "USD":
-            calculated_usd = case["amount"]
-        else:
-            calculated_usd = case["amount"] * case["rate"]
-
-        print(
-            f"{case['amount']} {case['currency']} = {calculated_usd:.2f} USD (expected: {case['expected_usd']:.2f})"
-        )
-        assert (
-            abs(calculated_usd - case["expected_usd"]) < 0.01
-        ), f"Conversion failed for {case['currency']}"
-
-    print("✓ All known conversions validated successfully")
-
-
-def check_conversion_consistency():
-    """
-    Verify that converting USD->Foreign->USD returns original amount.
-    """
-    print("=== Checking Conversion Consistency ===")
-
-    test_amount = 1000  # USD
-
-    # Test with pegged currencies
-    for currency, pegged_rate in [("JOD", JOD_PEGGED_USD), ("SAR", SAR_PEGGED_USD)]:
-        # USD to foreign
-        usd_per_forex_rate = pegged_rate
-        foreign_amount = test_amount / usd_per_forex_rate
-
-        # Foreign back to USD
-        back_to_usd = foreign_amount * usd_per_forex_rate
-
-        print(
-            f"${test_amount} USD -> {foreign_amount:.2f} {currency} -> ${back_to_usd:.2f} USD"
-        )
-        assert (
-            abs(back_to_usd - test_amount) < 0.01
-        ), f"Round-trip conversion failed for {currency}"
-
-    print("✓ All round-trip conversions validated successfully")
-
-
-def spot_check_sample_transactions(tf_with_conversions, n_samples=5):
+def spot_check_sample_transactions(tf_with_conversions, standardized_xr_data n_samples=5):
     """
     Display sample conversions with intermediate steps for manual verification.
 
     Args:
         tf_with_conversions (pd.DataFrame): Transaction data with conversions applied
+        standardized_xr_data (pd.DataFrame): Standardized exchange rate data usd per forex
         n_samples (int): Number of samples to display
     """
     print("=== Spot Check Sample Transactions ===")
@@ -388,7 +321,10 @@ def spot_check_sample_transactions(tf_with_conversions, n_samples=5):
         print(f"  Date: {row['date']}")
         print(f"  Original: {row['transaction_value']:.2f} {row['currency']}")
         print(
-            f"  Exchange Rate (1 {row['currency']} = X USD): {row['exchange_rate']:.4f}"
+            f"  Merged Exchange Rate (1 {row['currency']} = X USD): {row['exchange_rate']:.4f}"
+        )
+        print(
+            f"  Standarized Exchange Rate (1 {standardized_xr_data.loc[row['date']]} = X USD)"
         )
         print(f"  Converted: ${row['transaction_value_usd']:.2f} USD")
 
@@ -399,156 +335,3 @@ def spot_check_sample_transactions(tf_with_conversions, n_samples=5):
             )
 
 
-def compare_old_vs_new_results(tf_old, tf_new, tolerance=0.01):
-    """
-    Compare results from old vs new implementation on sample data.
-
-    Args:
-        tf_old (pd.DataFrame): Results from old implementation
-        tf_new (pd.DataFrame): Results from new implementation
-        tolerance (float): Acceptable difference threshold
-    """
-    print("=== Comparing Old vs New Results ===")
-
-    # Find common transactions
-    common_ids = set(tf_old.get("iati_identifier", [])) & set(
-        tf_new.get("iati_identifier", [])
-    )
-
-    if not common_ids:
-        print("No common transaction identifiers found for comparison")
-        return
-
-    differences = []
-
-    for tx_id in list(common_ids)[:10]:  # Check first 10 common transactions
-        old_row = tf_old[tf_old["iati_identifier"] == tx_id].iloc[0]
-        new_row = tf_new[tf_new["iati_identifier"] == tx_id].iloc[0]
-
-        old_usd = old_row.get("transaction_value_usd", 0)
-        new_usd = new_row.get("transaction_value_usd", 0)
-
-        if pd.notna(old_usd) and pd.notna(new_usd):
-            diff = abs(old_usd - new_usd)
-            differences.append(diff)
-
-            if diff > tolerance:
-                print(
-                    f"⚠️  Large difference for {tx_id}: Old=${old_usd:.2f}, New=${new_usd:.2f}, Diff=${diff:.2f}"
-                )
-            else:
-                print(
-                    f"✓ {tx_id}: Old=${old_usd:.2f}, New=${new_usd:.2f}, Diff=${diff:.4f}"
-                )
-
-    if differences:
-        avg_diff = np.mean(differences)
-        max_diff = np.max(differences)
-        print(
-            f"\nSummary: Avg difference=${avg_diff:.4f}, Max difference=${max_diff:.4f}"
-        )
-    else:
-        print("No comparable transactions found")
-
-
-def debug_exchange_rate_matching(tf_final, standardized_xr, special_rates, n_samples=10):
-    """
-    Compare exchange rates in final transaction data with raw standardized exchange rate data
-    to debug potential merging issues.
-    
-    Args:
-        tf_final (pd.DataFrame): Final transaction data with exchange rates
-        standardized_xr (pd.DataFrame): Standardized exchange rate data
-        special_rates (dict): Special currency rate data
-        n_samples (int): Number of samples to check
-    """
-    print("=== Exchange Rate Matching Debug ===")
-    
-    # Sample transactions with non-USD currencies
-    non_usd_transactions = tf_final[
-        (tf_final["currency"] != "USD") & 
-        (tf_final["exchange_rate"].notna())
-    ]
-    
-    if len(non_usd_transactions) == 0:
-        print("No non-USD transactions found for comparison")
-        return
-    
-    sample_transactions = non_usd_transactions.sample(n=min(n_samples, len(non_usd_transactions)))
-    
-    for _, row in sample_transactions.iterrows():
-        currency = row["currency"]
-        transaction_date = row["date"]
-        final_rate = row["exchange_rate"]
-        
-        print(f"\n--- {currency} Transaction on {transaction_date} ---")
-        print(f"Final exchange rate used: {final_rate:.6f}")
-        
-        # Check if currency is in special rates
-        if currency in special_rates:
-            print(f"Currency {currency} uses special rates (pegged/manual)")
-            special_rate_data = special_rates[currency]
-            
-            # Find closest date in special rates
-            if transaction_date in special_rate_data.index:
-                exact_rate = special_rate_data.loc[transaction_date, "rate"]
-                print(f"Exact match in special rates: {exact_rate:.6f}")
-            else:
-                # Find nearest date
-                nearest_idx = special_rate_data.index.get_indexer([transaction_date], method="nearest")[0]
-                nearest_date = special_rate_data.index[nearest_idx]
-                nearest_rate = special_rate_data.iloc[nearest_idx]["rate"]
-                print(f"Nearest date in special rates: {nearest_date} -> {nearest_rate:.6f}")
-                
-        elif currency in standardized_xr.columns:
-            print(f"Currency {currency} uses Federal Reserve data")
-            
-            # Check if exact date exists
-            if transaction_date in standardized_xr.index:
-                exact_rate = standardized_xr.loc[transaction_date, currency]
-                print(f"Exact match in Fed data: {exact_rate:.6f}")
-                if pd.notna(exact_rate):
-                    rate_diff = abs(final_rate - exact_rate)
-                    if rate_diff > 0.0001:
-                        print(f"⚠️  MISMATCH! Difference: {rate_diff:.6f}")
-                    else:
-                        print("✓ Rates match")
-                else:
-                    print("⚠️  Exact date has NaN value in Fed data")
-            else:
-                print(f"No exact date match in Fed data for {transaction_date}")
-                
-            # Find nearest available date in Fed data
-            currency_data = standardized_xr[[currency]].dropna()
-            if len(currency_data) > 0:
-                nearest_idx = currency_data.index.get_indexer([transaction_date], method="nearest")[0]
-                nearest_date = currency_data.index[nearest_idx]
-                nearest_rate = currency_data.iloc[nearest_idx][currency]
-                days_diff = abs((transaction_date - nearest_date).days)
-                
-                print(f"Nearest available date: {nearest_date} ({days_diff} days away)")
-                print(f"Nearest rate in Fed data: {nearest_rate:.6f}")
-                
-                rate_diff = abs(final_rate - nearest_rate)
-                if rate_diff > 0.0001:
-                    print(f"⚠️  MISMATCH! Difference: {rate_diff:.6f}")
-                else:
-                    print("✓ Rates match nearest available")
-        else:
-            print(f"⚠️  Currency {currency} not found in any exchange rate data")
-            
-        # Show a few surrounding dates from Fed data for context
-        if currency in standardized_xr.columns:
-            print(f"\nContext - Fed data around {transaction_date}:")
-            start_date = transaction_date - pd.Timedelta(days=3)
-            end_date = transaction_date + pd.Timedelta(days=3)
-            
-            context_data = standardized_xr[
-                (standardized_xr.index >= start_date) & 
-                (standardized_xr.index <= end_date)
-            ][[currency]].dropna()
-            
-            for date, rate_row in context_data.iterrows():
-                rate_val = rate_row[currency]
-                marker = "★" if date == transaction_date else " "
-                print(f"  {marker} {date}: {rate_val:.6f}")
