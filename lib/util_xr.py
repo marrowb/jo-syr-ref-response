@@ -171,55 +171,98 @@ def find_exchange_rates_for_currency(tf_prepared, currency_data, special_rates):
 
     # Get unique currencies in transactions
     unique_currencies = tf_with_rates["currency"].dropna().unique()
+    
+    print(f"Processing {len(unique_currencies)} unique currencies: {list(unique_currencies)}")
 
     for currency in unique_currencies:
+        print(f"\n--- Processing currency: {currency} ---")
+        
         if currency == "USD":
             # USD transactions don't need exchange rates
             mask = tf_with_rates["currency"] == currency
             tf_with_rates.loc[mask, "exchange_rate"] = 1.0
+            print(f"USD: Set {mask.sum()} transactions to rate 1.0")
             continue
+
+        # Get transactions for this currency
+        currency_mask = tf_with_rates["currency"] == currency
+        currency_transactions = tf_with_rates[currency_mask].copy()
+        
+        if len(currency_transactions) == 0:
+            continue
+            
+        print(f"Found {len(currency_transactions)} transactions for {currency}")
+        
+        # Show sample transaction dates
+        sample_dates = currency_transactions["date"].dropna().sort_values()
+        if len(sample_dates) > 0:
+            print(f"Transaction date range: {sample_dates.iloc[0]} to {sample_dates.iloc[-1]}")
+            print(f"Sample transaction dates: {sample_dates.head(3).tolist()}")
 
         # Check if currency has special handling
         if currency in special_rates:
+            print(f"Using special rates for {currency}")
             rate_data = special_rates[currency].reset_index()
-            currency_transactions = tf_with_rates[
-                tf_with_rates["currency"] == currency
-            ].copy()
-
+            
+            # Debug rate data
+            print(f"Special rate data shape: {rate_data.shape}")
+            print(f"Rate date range: {rate_data['date'].min()} to {rate_data['date'].max()}")
+            
+            # Ensure both dataframes are properly sorted and have compatible dtypes
+            currency_transactions_sorted = currency_transactions.sort_values("date").copy()
+            rate_data_sorted = rate_data.sort_values("date").copy()
+            
+            # Ensure datetime types are compatible
+            currency_transactions_sorted["date"] = pd.to_datetime(currency_transactions_sorted["date"])
+            rate_data_sorted["date"] = pd.to_datetime(rate_data_sorted["date"])
+            
             # Use merge_asof to find closest rates
             merged = pd.merge_asof(
-                currency_transactions.sort_values("date"),
-                rate_data.sort_values("date"),
+                currency_transactions_sorted,
+                rate_data_sorted,
                 on="date",
                 direction="nearest",
             )
+            
+            # Debug merge results
+            debug_merge_results(currency_transactions_sorted, rate_data_sorted, merged, currency)
 
-            # Update exchange rates
-            tf_with_rates.loc[
-                tf_with_rates["currency"] == currency, "exchange_rate"
-            ] = merged["rate"].values
+            # Update exchange rates using the original index
+            tf_with_rates.loc[currency_mask, "exchange_rate"] = merged["rate"].values
 
         elif currency in currency_data.columns:
+            print(f"Using Federal Reserve data for {currency}")
             # Use Federal Reserve data
             rate_data = currency_data[[currency]].dropna().reset_index()
             rate_data = rate_data.rename(columns={currency: "rate"})
+            
+            # Debug rate data
+            print(f"Fed rate data shape: {rate_data.shape}")
+            if len(rate_data) > 0:
+                print(f"Rate date range: {rate_data['date'].min()} to {rate_data['date'].max()}")
+                print(f"Sample rates: {rate_data.head(3)[['date', 'rate']].to_dict('records')}")
 
-            currency_transactions = tf_with_rates[
-                tf_with_rates["currency"] == currency
-            ].copy()
+            # Ensure both dataframes are properly sorted and have compatible dtypes
+            currency_transactions_sorted = currency_transactions.sort_values("date").copy()
+            rate_data_sorted = rate_data.sort_values("date").copy()
+            
+            # Ensure datetime types are compatible
+            currency_transactions_sorted["date"] = pd.to_datetime(currency_transactions_sorted["date"])
+            rate_data_sorted["date"] = pd.to_datetime(rate_data_sorted["date"])
 
             # Use merge_asof to find closest rates
             merged = pd.merge_asof(
-                currency_transactions.sort_values("date"),
-                rate_data.sort_values("date"),
+                currency_transactions_sorted,
+                rate_data_sorted,
                 on="date",
                 direction="nearest",
             )
+            
+            # Debug merge results
+            debug_merge_results(currency_transactions_sorted, rate_data_sorted, merged, currency)
 
-            # Update exchange rates
-            tf_with_rates.loc[
-                tf_with_rates["currency"] == currency, "exchange_rate"
-            ] = merged["rate"].values
+            # Update exchange rates using the original index
+            tf_with_rates.loc[currency_mask, "exchange_rate"] = merged["rate"].values
 
         else:
             print(f"Warning: No exchange rate data available for currency {currency}")
@@ -249,6 +292,46 @@ def apply_currency_conversions(tf_with_rates):
     )
 
     return tf_final
+
+
+def manual_nearest_date_merge(transactions_df, rate_data_df, date_col="date", rate_col="rate"):
+    """
+    Alternative to merge_asof that manually finds the nearest date for each transaction.
+    Use this if merge_asof continues to have issues.
+    
+    Args:
+        transactions_df (pd.DataFrame): Transaction data with date column
+        rate_data_df (pd.DataFrame): Rate data with date and rate columns
+        date_col (str): Name of date column
+        rate_col (str): Name of rate column
+        
+    Returns:
+        pd.DataFrame: Transactions with rate column added
+    """
+    result_df = transactions_df.copy()
+    result_df[rate_col] = np.nan
+    
+    # Convert to numpy arrays for faster searching
+    rate_dates = pd.to_datetime(rate_data_df[date_col]).values
+    rate_values = rate_data_df[rate_col].values
+    
+    for idx, row in transactions_df.iterrows():
+        trans_date = pd.to_datetime(row[date_col])
+        
+        # Find the closest date
+        date_diffs = np.abs((rate_dates - trans_date).astype('timedelta64[D]').astype(int))
+        closest_idx = np.argmin(date_diffs)
+        
+        result_df.loc[idx, rate_col] = rate_values[closest_idx]
+        
+        # Debug output for first few transactions
+        if idx < 3:
+            closest_date = rate_dates[closest_idx]
+            days_diff = date_diffs[closest_idx]
+            print(f"Manual merge: {trans_date.date()} -> {pd.to_datetime(closest_date).date()} "
+                  f"(rate: {rate_values[closest_idx]:.6f}, {days_diff} days diff)")
+    
+    return result_df
 
 
 def convert_all_to_usd(tf: pd.DataFrame):
@@ -298,6 +381,40 @@ def convert_all_to_usd(tf: pd.DataFrame):
 
 
 # Validation Functions
+
+
+def debug_merge_results(transactions_df, rate_data_df, merged_df, currency):
+    """
+    Debug the merge_asof results by showing what dates were matched.
+    
+    Args:
+        transactions_df (pd.DataFrame): Original transaction data (sorted)
+        rate_data_df (pd.DataFrame): Rate data used for merge (sorted)
+        merged_df (pd.DataFrame): Result of merge_asof
+        currency (str): Currency being processed
+    """
+    print(f"  Debug merge for {currency}:")
+    
+    # Show a few examples of what got matched
+    sample_size = min(3, len(merged_df))
+    for i in range(sample_size):
+        trans_date = merged_df.iloc[i]["date"]
+        matched_rate = merged_df.iloc[i]["rate"]
+        
+        # Find what the actual closest rate should be
+        rate_dates = rate_data_df["date"]
+        closest_idx = (rate_dates - trans_date).abs().idxmin()
+        actual_closest_date = rate_data_df.loc[closest_idx, "date"]
+        actual_closest_rate = rate_data_df.loc[closest_idx, "rate"]
+        
+        print(f"    Transaction {i+1}: {trans_date}")
+        print(f"      Merged rate: {matched_rate:.6f}")
+        print(f"      Actual closest: {actual_closest_rate:.6f} (from {actual_closest_date})")
+        
+        if abs(matched_rate - actual_closest_rate) > 1e-6:
+            print(f"      ⚠️  MISMATCH! Difference: {abs(matched_rate - actual_closest_rate):.6f}")
+        else:
+            print(f"      ✓ Match confirmed")
 
 
 def spot_check_sample_transactions(tf_with_conversions, standardized_xr_data, n_samples=5):
@@ -370,13 +487,30 @@ def spot_check_sample_transactions(tf_with_conversions, standardized_xr_data, n_
             )
             actual_rate = merged['rate'].iloc[0] if not merged.empty else None
         
-        # Compare rates
+        # Compare rates with enhanced debugging
         if actual_rate is not None:
             print(f"Actual Closest Rate: {actual_rate:.6f} (from {rate_source})")
             rate_match = abs(row['exchange_rate'] - actual_rate) < tolerance
             print(f"Rate Match: {'✓ YES' if rate_match else '✗ NO'}")
             if not rate_match:
                 print(f"  Difference: {abs(row['exchange_rate'] - actual_rate):.8f}")
+                
+                # Additional debugging for mismatches
+                if row['currency'] in standardized_xr_data.columns:
+                    # Show nearby rates to understand the mismatch
+                    rate_data = standardized_xr_data[[row['currency']]].dropna()
+                    trans_date = row['date']
+                    
+                    # Find rates within +/- 7 days
+                    date_diff = (rate_data.index - trans_date).days
+                    nearby_mask = abs(date_diff) <= 7
+                    nearby_rates = rate_data[nearby_mask]
+                    
+                    if len(nearby_rates) > 0:
+                        print(f"  Nearby rates (±7 days):")
+                        for date, rate_val in nearby_rates.iterrows():
+                            days_diff = (date - trans_date).days
+                            print(f"    {date.date()}: {rate_val.iloc[0]:.6f} ({days_diff:+d} days)")
         else:
             print(f"Actual Closest Rate: NOT FOUND (from {rate_source})")
             print("Rate Match: ✗ NO - Missing source data")
