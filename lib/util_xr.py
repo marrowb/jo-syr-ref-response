@@ -50,19 +50,30 @@ def standardize_xr_data_forex_to_usd(xr_df, conversion_directions):
     """
     standardized_xr = xr_df.copy()
 
-    # Identify usd_to_forex currencies (those NOT containing "$US" in direction)
-    usd_to_forex_currencies = [
-        currency
-        for currency, direction in conversion_directions.items()
-        if "$US" not in str(direction)
-    ]
+    print("=== Exchange Rate Direction Analysis ===")
+    
+    # Identify currencies by their direction indicators
+    forex_to_usd_currencies = []
+    usd_to_forex_currencies = []
+    
+    for currency, direction in conversion_directions.items():
+        if "$US" in str(direction):
+            forex_to_usd_currencies.append(currency)
+            print(f"{currency}: {direction} -> forex_to_usd (already correct)")
+        else:
+            usd_to_forex_currencies.append(currency)
+            print(f"{currency}: {direction} -> usd_to_forex (needs inversion)")
 
     # Convert usd_to_forex rates to forex_to_usd by taking reciprocal
     for currency in usd_to_forex_currencies:
         if currency in standardized_xr.columns:
+            original_sample = standardized_xr[currency].dropna().iloc[0] if not standardized_xr[currency].dropna().empty else "N/A"
             # Take reciprocal: if 1 USD = 92.55 JPY, then 1 JPY = 1/92.55 USD = 0.0108 USD
             standardized_xr[currency] = 1 / standardized_xr[currency]
+            inverted_sample = standardized_xr[currency].dropna().iloc[0] if not standardized_xr[currency].dropna().empty else "N/A"
+            print(f"  {currency}: {original_sample} -> {inverted_sample}")
 
+    print("=== Standardization Complete ===")
     return standardized_xr
 
 
