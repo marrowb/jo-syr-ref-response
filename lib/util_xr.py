@@ -292,7 +292,7 @@ def convert_all_to_usd(tf: pd.DataFrame):
 
     # Debug exchange rate matching
     print("\nRunning exchange rate debug check...")
-    debug_exchange_rate_matching(tf_final, standardized_xr, special_rates, n_samples=5)
+    spot_check_sample_transactions(tf_final, standardized_xr, n_samples=5)
 
     return tf_final
 
@@ -300,38 +300,106 @@ def convert_all_to_usd(tf: pd.DataFrame):
 # Validation Functions
 
 
-def spot_check_sample_transactions(tf_with_conversions, standardized_xr_data n_samples=5):
+def spot_check_sample_transactions(tf_with_conversions, standardized_xr_data, n_samples=5):
     """
     Display sample conversions with intermediate steps for manual verification.
+    Validates that merge_asof operation worked correctly by comparing merged rates
+    with actual closest rates from source data.
 
     Args:
         tf_with_conversions (pd.DataFrame): Transaction data with conversions applied
-        standardized_xr_data (pd.DataFrame): Standardized exchange rate data usd per forex
+        standardized_xr_data (pd.DataFrame): Standardized exchange rate data (usd per forex)
         n_samples (int): Number of samples to display
     """
     print("=== Spot Check Sample Transactions ===")
+    print("Validating merge_asof accuracy and conversion formulas...\n")
 
-    # Sample different currencies
+    # Load special rates for comparison
+    special_rates = create_special_currency_rates()
+
+    # Sample different currencies if possible
     sample_df = tf_with_conversions.dropna(
         subset=["exchange_rate", "transaction_value_usd"]
     ).sample(n=min(n_samples, len(tf_with_conversions)))
 
-    for _, row in sample_df.iterrows():
-        print(f"\nTransaction: {row.get('iati_identifier', 'Unknown')}")
-        print(f"  Date: {row['date']}")
-        print(f"  Original: {row['transaction_value']:.2f} {row['currency']}")
-        print(
-            f"  Merged Exchange Rate (1 {row['currency']} = X USD): {row['exchange_rate']:.4f}"
-        )
-        print(
-            f"  Standarized Exchange Rate (1 {standardized_xr_data.loc[row['date']]} = X USD)"
-        )
-        print(f"  Converted: ${row['transaction_value_usd']:.2f} USD")
+    tolerance = 1e-6  # Small tolerance for floating point comparison
 
-        if row["currency"] != "USD":
-            manual_calc = row["transaction_value"] * row["exchange_rate"]
-            print(
-                f"  Manual calculation: {row['transaction_value']:.2f} * {row['exchange_rate']:.4f} = ${manual_calc:.2f}"
+    for i, (_, row) in enumerate(sample_df.iterrows(), 1):
+        print(f"--- Sample {i}/{len(sample_df)} ---")
+        print(f"Transaction ID: {row.get('iati_identifier', 'Unknown')}")
+        print(f"Date: {row['date']}")
+        print(f"Currency: {row['currency']}")
+        print(f"Original Value: {row['transaction_value']:.2f} {row['currency']}")
+        print(f"Merged Exchange Rate: {row['exchange_rate']:.6f}")
+        
+        # Find the actual closest exchange rate from source data
+        actual_rate = None
+        rate_source = "Unknown"
+        
+        if row['currency'] == 'USD':
+            actual_rate = 1.0
+            rate_source = "USD (no conversion needed)"
+        elif row['currency'] in special_rates:
+            # Handle special currencies
+            rate_source = f"Special rate ({row['currency']})"
+            special_df = special_rates[row['currency']].reset_index()
+            
+            # Find closest date using merge_asof
+            temp_df = pd.DataFrame({'date': [row['date']]})
+            merged = pd.merge_asof(
+                temp_df.sort_values('date'),
+                special_df.sort_values('date'),
+                on='date',
+                direction='nearest'
             )
+            actual_rate = merged['rate'].iloc[0] if not merged.empty else None
+            
+        elif row['currency'] in standardized_xr_data.columns:
+            # Handle Federal Reserve data
+            rate_source = f"Federal Reserve ({row['currency']})"
+            rate_data = standardized_xr_data[[row['currency']]].dropna().reset_index()
+            rate_data = rate_data.rename(columns={row['currency']: 'rate'})
+            
+            # Find closest date using merge_asof
+            temp_df = pd.DataFrame({'date': [row['date']]})
+            merged = pd.merge_asof(
+                temp_df.sort_values('date'),
+                rate_data.sort_values('date'),
+                on='date',
+                direction='nearest'
+            )
+            actual_rate = merged['rate'].iloc[0] if not merged.empty else None
+        
+        # Compare rates
+        if actual_rate is not None:
+            print(f"Actual Closest Rate: {actual_rate:.6f} (from {rate_source})")
+            rate_match = abs(row['exchange_rate'] - actual_rate) < tolerance
+            print(f"Rate Match: {'✓ YES' if rate_match else '✗ NO'}")
+            if not rate_match:
+                print(f"  Difference: {abs(row['exchange_rate'] - actual_rate):.8f}")
+        else:
+            print(f"Actual Closest Rate: NOT FOUND (from {rate_source})")
+            print("Rate Match: ✗ NO - Missing source data")
+        
+        # Validate conversion formula
+        print(f"Converted USD Value: ${row['transaction_value_usd']:.2f}")
+        
+        if row['currency'] == 'USD':
+            expected_usd = row['transaction_value']
+            print(f"Expected USD (no conversion): ${expected_usd:.2f}")
+        else:
+            # Since rates are usd_per_forex: foreign_amount * rate = usd_amount
+            expected_usd = row['transaction_value'] * row['exchange_rate']
+            print(f"Manual Calculation: {row['transaction_value']:.2f} * {row['exchange_rate']:.6f} = ${expected_usd:.2f}")
+        
+        conversion_match = abs(row['transaction_value_usd'] - expected_usd) < tolerance
+        print(f"Conversion Match: {'✓ YES' if conversion_match else '✗ NO'}")
+        
+        if not conversion_match:
+            print(f"  Difference: ${abs(row['transaction_value_usd'] - expected_usd):.6f}")
+        
+        print()  # Empty line for readability
+    
+    print("=== Spot Check Complete ===")
 
 
