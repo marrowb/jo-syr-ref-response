@@ -12,13 +12,14 @@ def load_and_prepare_exchange_rates():
 
     Returns:
         pd.DataFrame: Exchange rate data with date index and cleaned columns
-        dict: Mapping of currency codes to their direction (forex_to_usd or usd_to_forex)
+        dict: Mapping of currency codes to their direction (usd_per_forex or forex_per_usd)
     """
     xr = pd.read_csv(os.path.join(ROOT_DIR, "data", "xr", "fed_xr_2010_2025.csv"))
 
     # Get conversion directions from row 3
-    conversion_directions = xr.iloc[3].to_dict()
-    conversion_directions.pop("Series Description", None)
+    conversion_directions = dict(zip(xr.iloc[2], xr.iloc[3]))
+    conversion_directions.pop("Currency:", None)
+    embed(banner1="conversion direction codes")
 
     # Set proper column names from row 2 (currency codes)
     xr.columns = xr.iloc[2]
@@ -37,9 +38,9 @@ def load_and_prepare_exchange_rates():
     return xr, conversion_directions
 
 
-def standardize_xr_data_forex_to_usd(xr_df, conversion_directions):
+def standardize_xr_data_usd_per_forex(xr_df, conversion_directions):
     """
-    Convert all exchange rates to consistent forex_to_usd format.
+    Convert all exchange rates to reflect usd per forex
 
     Args:
         xr_df (pd.DataFrame): Exchange rate data
@@ -51,26 +52,35 @@ def standardize_xr_data_forex_to_usd(xr_df, conversion_directions):
     standardized_xr = xr_df.copy()
 
     print("=== Exchange Rate Direction Analysis ===")
-    
+
     # Identify currencies by their direction indicators
-    forex_to_usd_currencies = []
-    usd_to_forex_currencies = []
-    
+    usd_per_forex_currencies = []
+    forex_per_usd_currencies = []
+
     for currency, direction in conversion_directions.items():
         if "$US" in str(direction):
-            forex_to_usd_currencies.append(currency)
-            print(f"{currency}: {direction} -> forex_to_usd (already correct)")
+            usd_per_forex_currencies.append(currency)
+            print(f"{currency}: {direction} -> usd_per_forex (already correct)")
         else:
-            usd_to_forex_currencies.append(currency)
-            print(f"{currency}: {direction} -> usd_to_forex (needs inversion)")
+            forex_per_usd_currencies.append(currency)
+            print(f"{currency}: {direction} -> forex_per_usd (needs inversion)")
 
-    # Convert usd_to_forex rates to forex_to_usd by taking reciprocal
-    for currency in usd_to_forex_currencies:
+    embed(banner1="In Standardization function")
+    # Convert forex_per_usd rates to usd_per_forex by taking reciprocal
+    for currency in forex_per_usd_currencies:
         if currency in standardized_xr.columns:
-            original_sample = standardized_xr[currency].dropna().iloc[0] if not standardized_xr[currency].dropna().empty else "N/A"
+            original_sample = (
+                standardized_xr[currency].dropna().iloc[0]
+                if not standardized_xr[currency].dropna().empty
+                else "N/A"
+            )
             # Take reciprocal: if 1 USD = 92.55 JPY, then 1 JPY = 1/92.55 USD = 0.0108 USD
             standardized_xr[currency] = 1 / standardized_xr[currency]
-            inverted_sample = standardized_xr[currency].dropna().iloc[0] if not standardized_xr[currency].dropna().empty else "N/A"
+            inverted_sample = (
+                standardized_xr[currency].dropna().iloc[0]
+                if not standardized_xr[currency].dropna().empty
+                else "N/A"
+            )
             print(f"  {currency}: {original_sample} -> {inverted_sample}")
 
     print("=== Standardization Complete ===")
@@ -108,24 +118,24 @@ def create_special_currency_rates():
     """
     special_rates = {}
 
-    # JOD - Pegged currency (already in forex_to_usd format)
+    # JOD - Pegged currency (already in usd_per_forex format)
     jod_rate = JOD_PEGGED_USD  # 1 JOD = X USD
     special_rates["JOD"] = pd.DataFrame(
         {"date": pd.date_range("2010-01-01", "2025-12-31", freq="D"), "rate": jod_rate}
     ).set_index("date")
 
-    # SAR - Pegged currency (already in forex_to_usd format)
+    # SAR - Pegged currency (already in usd_per_forex format)
     sar_rate = SAR_PEGGED_USD  # 1 SAR = X USD
     special_rates["SAR"] = pd.DataFrame(
         {"date": pd.date_range("2010-01-01", "2025-12-31", freq="D"), "rate": sar_rate}
     ).set_index("date")
 
-    # CZK - Manual rates (already in forex_to_usd format)
+    # CZK - Manual rates (already in usd_per_forex format)
     czk_data = {
         "2016-09-22": 0.0414,  # 1 CZK = 0.0414 USD
         "2017-06-06": 0.0455,  # 1 CZK = 0.0455 USD
         "2018-05-11": 0.0468,  # 1 CZK = 0.0468 USD
-        "2019-08-13": 0.043,   # 1 CZK = 0.043 USD
+        "2019-08-13": 0.043,  # 1 CZK = 0.043 USD
         "2021-07-01": 0.0463,  # 1 CZK = 0.0463 USD
     }
 
@@ -230,7 +240,7 @@ def apply_currency_conversions(tf_with_rates):
     """
     tf_final = tf_with_rates.copy()
 
-    # Since all rates are now forex_to_usd format, conversion is simple:
+    # Since all rates are now usd_per_forex format, conversion is simple:
     # foreign_amount * exchange_rate = usd_amount
     tf_final["transaction_value_usd"] = np.where(
         tf_final["currency"] == "USD",
@@ -248,7 +258,7 @@ def convert_all_to_usd(tf: pd.DataFrame):
 
     This function orchestrates the entire conversion process:
     1. Load and prepare exchange rate data
-    2. Standardize all rates to usd_to_forex format
+    2. Standardize all rates to forex_per_usd format
     3. Prepare transaction dates
     4. Find exchange rates for all currencies
     5. Apply conversions
@@ -262,8 +272,8 @@ def convert_all_to_usd(tf: pd.DataFrame):
     print("Loading and preparing exchange rate data...")
     xr_data, conversion_directions = load_and_prepare_exchange_rates()
 
-    print("Standardizing exchange rates to forex_to_usd format...")
-    standardized_xr = standardize_xr_data_forex_to_usd(xr_data, conversion_directions)
+    print("Standardizing exchange rates to usd_per_forex format...")
+    standardized_xr = standardize_xr_data_usd_per_forex(xr_data, conversion_directions)
     embed(banner1="Post xr standardization")
 
     print("Preparing transaction dates...")
@@ -337,11 +347,11 @@ def check_conversion_consistency():
     # Test with pegged currencies
     for currency, pegged_rate in [("JOD", JOD_PEGGED_USD), ("SAR", SAR_PEGGED_USD)]:
         # USD to foreign
-        forex_to_usd_rate = pegged_rate
-        foreign_amount = test_amount / forex_to_usd_rate
+        usd_per_forex_rate = pegged_rate
+        foreign_amount = test_amount / usd_per_forex_rate
 
         # Foreign back to USD
-        back_to_usd = foreign_amount * forex_to_usd_rate
+        back_to_usd = foreign_amount * usd_per_forex_rate
 
         print(
             f"${test_amount} USD -> {foreign_amount:.2f} {currency} -> ${back_to_usd:.2f} USD"
