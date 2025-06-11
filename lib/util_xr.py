@@ -37,30 +37,30 @@ def load_and_prepare_exchange_rates():
     return xr, conversion_directions
 
 
-def standardize_xr_data_usd_to_forex(xr_df, conversion_directions):
+def standardize_xr_data_forex_to_usd(xr_df, conversion_directions):
     """
-    Convert all exchange rates to consistent usd_to_forex format.
+    Convert all exchange rates to consistent forex_to_usd format.
 
     Args:
         xr_df (pd.DataFrame): Exchange rate data
         conversion_directions (dict): Currency direction mappings
 
     Returns:
-        pd.DataFrame: Standardized exchange rates where all rates represent "1 USD = X foreign currency"
+        pd.DataFrame: Standardized exchange rates where all rates represent "1 foreign currency = X USD"
     """
     standardized_xr = xr_df.copy()
 
-    # Identify forex_to_usd currencies (those containing "$US" in direction)
-    forex_to_usd_currencies = [
+    # Identify usd_to_forex currencies (those NOT containing "$US" in direction)
+    usd_to_forex_currencies = [
         currency
         for currency, direction in conversion_directions.items()
-        if "$US" in str(direction)
+        if "$US" not in str(direction)
     ]
 
-    # Convert forex_to_usd rates to usd_to_forex by taking reciprocal
-    for currency in forex_to_usd_currencies:
+    # Convert usd_to_forex rates to forex_to_usd by taking reciprocal
+    for currency in usd_to_forex_currencies:
         if currency in standardized_xr.columns:
-            # Take reciprocal: if 1 EUR = 1.4419 USD, then 1 USD = 1/1.4419 EUR = 0.6936 EUR
+            # Take reciprocal: if 1 USD = 92.55 JPY, then 1 JPY = 1/92.55 USD = 0.0108 USD
             standardized_xr[currency] = 1 / standardized_xr[currency]
 
     return standardized_xr
@@ -97,25 +97,25 @@ def create_special_currency_rates():
     """
     special_rates = {}
 
-    # JOD - Pegged currency (convert to usd_to_forex format)
-    jod_rate = 1 / JOD_PEGGED_USD  # 1 USD = X JOD
+    # JOD - Pegged currency (already in forex_to_usd format)
+    jod_rate = JOD_PEGGED_USD  # 1 JOD = X USD
     special_rates["JOD"] = pd.DataFrame(
         {"date": pd.date_range("2010-01-01", "2025-12-31", freq="D"), "rate": jod_rate}
     ).set_index("date")
 
-    # SAR - Pegged currency (convert to usd_to_forex format)
-    sar_rate = 1 / SAR_PEGGED_USD  # 1 USD = X SAR
+    # SAR - Pegged currency (already in forex_to_usd format)
+    sar_rate = SAR_PEGGED_USD  # 1 SAR = X USD
     special_rates["SAR"] = pd.DataFrame(
         {"date": pd.date_range("2010-01-01", "2025-12-31", freq="D"), "rate": sar_rate}
     ).set_index("date")
 
-    # CZK - Manual rates (convert to usd_to_forex format)
+    # CZK - Manual rates (already in forex_to_usd format)
     czk_data = {
-        "2016-09-22": 1 / 0.0414,  # 24.15
-        "2017-06-06": 1 / 0.0455,  # 21.98
-        "2018-05-11": 1 / 0.0468,  # 21.37
-        "2019-08-13": 1 / 0.043,  # 23.26
-        "2021-07-01": 1 / 0.0463,  # 21.60
+        "2016-09-22": 0.0414,  # 1 CZK = 0.0414 USD
+        "2017-06-06": 0.0455,  # 1 CZK = 0.0455 USD
+        "2018-05-11": 0.0468,  # 1 CZK = 0.0468 USD
+        "2019-08-13": 0.043,   # 1 CZK = 0.043 USD
+        "2021-07-01": 0.0463,  # 1 CZK = 0.0463 USD
     }
 
     czk_df = (
@@ -219,13 +219,13 @@ def apply_currency_conversions(tf_with_rates):
     """
     tf_final = tf_with_rates.copy()
 
-    # Since all rates are now usd_to_forex format, conversion is simple:
-    # foreign_amount / exchange_rate = usd_amount
+    # Since all rates are now forex_to_usd format, conversion is simple:
+    # foreign_amount * exchange_rate = usd_amount
     tf_final["transaction_value_usd"] = np.where(
         tf_final["currency"] == "USD",
         tf_final["transaction_value"],  # USD transactions stay the same
         tf_final["transaction_value"]
-        / tf_final["exchange_rate"],  # Convert foreign to USD
+        * tf_final["exchange_rate"],  # Convert foreign to USD
     )
 
     return tf_final
@@ -251,8 +251,8 @@ def convert_all_to_usd(tf: pd.DataFrame):
     print("Loading and preparing exchange rate data...")
     xr_data, conversion_directions = load_and_prepare_exchange_rates()
 
-    print("Standardizing exchange rates to usd_to_forex format...")
-    standardized_xr = standardize_xr_data_usd_to_forex(xr_data, conversion_directions)
+    print("Standardizing exchange rates to forex_to_usd format...")
+    standardized_xr = standardize_xr_data_forex_to_usd(xr_data, conversion_directions)
     embed(banner1="Post xr standardization")
 
     print("Preparing transaction dates...")
@@ -288,13 +288,13 @@ def validate_known_conversions():
         {
             "amount": 100,
             "currency": "JOD",
-            "rate": 1 / JOD_PEGGED_USD,
+            "rate": JOD_PEGGED_USD,
             "expected_usd": 100 * JOD_PEGGED_USD,
         },
         {
             "amount": 100,
             "currency": "SAR",
-            "rate": 1 / SAR_PEGGED_USD,
+            "rate": SAR_PEGGED_USD,
             "expected_usd": 100 * SAR_PEGGED_USD,
         },
     ]
@@ -303,7 +303,7 @@ def validate_known_conversions():
         if case["currency"] == "USD":
             calculated_usd = case["amount"]
         else:
-            calculated_usd = case["amount"] / case["rate"]
+            calculated_usd = case["amount"] * case["rate"]
 
         print(
             f"{case['amount']} {case['currency']} = {calculated_usd:.2f} USD (expected: {case['expected_usd']:.2f})"
@@ -326,11 +326,11 @@ def check_conversion_consistency():
     # Test with pegged currencies
     for currency, pegged_rate in [("JOD", JOD_PEGGED_USD), ("SAR", SAR_PEGGED_USD)]:
         # USD to foreign
-        usd_to_forex_rate = 1 / pegged_rate
-        foreign_amount = test_amount * usd_to_forex_rate
+        forex_to_usd_rate = pegged_rate
+        foreign_amount = test_amount / forex_to_usd_rate
 
         # Foreign back to USD
-        back_to_usd = foreign_amount / usd_to_forex_rate
+        back_to_usd = foreign_amount * forex_to_usd_rate
 
         print(
             f"${test_amount} USD -> {foreign_amount:.2f} {currency} -> ${back_to_usd:.2f} USD"
@@ -362,14 +362,14 @@ def spot_check_sample_transactions(tf_with_conversions, n_samples=5):
         print(f"  Date: {row['date']}")
         print(f"  Original: {row['transaction_value']:.2f} {row['currency']}")
         print(
-            f"  Exchange Rate (1 USD = X {row['currency']}): {row['exchange_rate']:.4f}"
+            f"  Exchange Rate (1 {row['currency']} = X USD): {row['exchange_rate']:.4f}"
         )
         print(f"  Converted: ${row['transaction_value_usd']:.2f} USD")
 
         if row["currency"] != "USD":
-            manual_calc = row["transaction_value"] / row["exchange_rate"]
+            manual_calc = row["transaction_value"] * row["exchange_rate"]
             print(
-                f"  Manual calculation: {row['transaction_value']:.2f} / {row['exchange_rate']:.4f} = ${manual_calc:.2f}"
+                f"  Manual calculation: {row['transaction_value']:.2f} * {row['exchange_rate']:.4f} = ${manual_calc:.2f}"
             )
 
 
