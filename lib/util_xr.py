@@ -377,39 +377,6 @@ def convert_all_to_usd(tf: pd.DataFrame):
 # Validation Functions
 
 
-def debug_merge_results(transactions_df, rate_data_df, merged_df, currency):
-    """
-    Debug the merge_asof results by showing what dates were matched.
-    
-    Args:
-        transactions_df (pd.DataFrame): Original transaction data (sorted)
-        rate_data_df (pd.DataFrame): Rate data used for merge (sorted)
-        merged_df (pd.DataFrame): Result of merge_asof
-        currency (str): Currency being processed
-    """
-    print(f"  Debug merge for {currency}:")
-    
-    # Show a few examples of what got matched
-    sample_size = min(3, len(merged_df))
-    for i in range(sample_size):
-        trans_date = merged_df.iloc[i]["date"]
-        matched_rate = merged_df.iloc[i]["rate"]
-        
-        # Find what the actual closest rate should be
-        rate_dates = rate_data_df["date"]
-        closest_idx = (rate_dates - trans_date).abs().idxmin()
-        actual_closest_date = rate_data_df.loc[closest_idx, "date"]
-        actual_closest_rate = rate_data_df.loc[closest_idx, "rate"]
-        
-        print(f"    Transaction {i+1}: {trans_date}")
-        print(f"      Merged rate: {matched_rate:.6f}")
-        print(f"      Actual closest: {actual_closest_rate:.6f} (from {actual_closest_date})")
-        
-        if abs(matched_rate - actual_closest_rate) > 1e-6:
-            print(f"      ⚠️  MISMATCH! Difference: {abs(matched_rate - actual_closest_rate):.6f}")
-        else:
-            print(f"      ✓ Match confirmed")
-
 
 def spot_check_sample_transactions(tf_with_conversions, standardized_xr_data, n_samples=5):
     """
