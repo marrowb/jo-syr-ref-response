@@ -310,7 +310,7 @@ def manual_nearest_date_merge(transactions_df, rate_data_df, date_col="date", ra
     rate_values = rate_data_df[rate_col].values
     
     for idx, row in transactions_df.iterrows():
-        trans_date = pd.to_datetime(row[date_col])
+        trans_date = pd.to_datetime(row[date_col]).to_numpy()
         
         # Find the closest date
         date_diffs = np.abs((rate_dates - trans_date).astype('timedelta64[D]').astype(int))
