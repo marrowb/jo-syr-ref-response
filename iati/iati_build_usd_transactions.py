@@ -199,6 +199,9 @@ def main():
 
     iati_ids = set(df["iati_identifier"].tolist())
 
+    # Filter columns with less than 10% null values
+    df = df.loc[:, df.isnull().sum() / len(df) < 0.1]
+
     # Uncomment these if you want to rebuild the transactions files
     # rows = build_transaction_rows_from_all_activities_json(iati_ids)
     # path = build_transaction_csv_from_datastore(iati_ids)
@@ -217,8 +220,14 @@ def main():
         rate = row["exchange_rate"]
         print(spot_check_xr_matching(date, currency, expected_rate=rate))
 
-    output_path = os.path.join(ROOT_DIR, "data", "iati", "transactions_usd.csv")
-    tf.to_csv(output_path)
+    tf = tf.loc[:, tf.isnull().sum() / len(tf) < 0.1]
+    output_path_activities = os.path.join(ROOT_DIR, "data", "iati", "activities.csv")
+    output_path_transactions = os.path.join(
+        ROOT_DIR, "data", "iati", "transactions_usd.cv"
+    )
+
+    df.to_csv(output_path_activities)
+    tf.to_csv(output_path_transactions)
 
 
 if __name__ == "__main__":

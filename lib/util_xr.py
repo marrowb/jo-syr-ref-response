@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 
 from definitions import ROOT_DIR, JOD_PEGGED_USD, SAR_PEGGED_USD
-from IPython import embed
 
 
 def load_and_prepare_exchange_rates():
