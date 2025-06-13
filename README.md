@@ -1,3 +1,27 @@
+# International Aid Flows in the Syrian Refugee Response in Jordan
+This project examines funding for the Syrian refugee response in Jordan since the beginning of the Syrian Civil war. It is split into two components:
+1. A comparison of UN funding for the response versus the number of Syrian refugees registered by UNHCR over time.
+2. The construction of a funding dataset that includes bilateral aid for Syrian refugees with data from the International Aid Transparency Initiative.
+
+
+# UNHCR Registered Refugees vs. Donor Contributions to the Syrian Refugee Response in Jordan
+## Replication
+Cloning this git repo will allow this code to run smoothly. The data will only be as recent as April 30, 2025. If you want to replicate this code with more recent data, instructions for obtaining it are below in data sources.
+
+## Data Sources
+### UNHCR Refugee Data
+“Situation Syria Regional Refugee Response,” last updated April 30, 2025. [link](https://data.unhcr.org/en/situations/syria/location/36)
+* Click the JSON button by "Refugees from Syria by Date" and save the file. That is located at [link]("./data/unhcr.json")
+
+### UN OCHA FTS Data
+“Syrian Arab Republic Regional Refugee and Resilience Plan (3RP),” UNOCHA Financial Tracking Service, 2013-2024 [link](https://fts.unocha.org/plans/1168/flows?f%5B0%5D=flowStatus%3Apaid).
+* Need to navigate to the funding page for each year from 2013-2024 and click the download button. Those Excel files are located [here]("./data/ocha-fts/")
+
+## Figures
+[Funding vs. Total Individuals]("./figures/contributions_vs_individuals.png")
+[Funding per Refugees]("./figures/contributions_vs_individuals.png")
+
+
 # IATI Aid Activity Classification Project
 
 A machine learning pipeline for automatically classifying International Aid Transparency Initiative (IATI) aid activities using DSPy and Google's Gemini models, with a focus on identifying refugee-related funding and programs in Jordan.
