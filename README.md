@@ -238,19 +238,64 @@ This pipeline transforms fragmented, multi-language, multi-currency aid data int
 
 ## Data Sources
 
-### Primary Sources
-- **IATI Datastore**: 40+ narrative fields from aid activities in Jordan
-    - https://iatistandard.org/en/iati-tools-and-resources/iati-datastore/
-- **Federal Reserve**: Daily exchange rates for major currencies (2010-2025)
-    - Free exchange rate data historical: https://www.federalreserve.gov/releases/h10/hist/
-- **OCHA FTS**: UN humanitarian funding data for validation and context
-    - Add links from above
+Understanding aid flows to Syrian refugees requires integrating multiple data sources that each provide essential but incomplete pieces of the funding puzzle. No single source captures the full scope of assistance, making data integration critical for comprehensive analysis.
 
-### Data Coverage
-- **Activities**: ~9,000 aid activities in Jordan (2010-2024)
-- **Transactions**: Financial flows with multi-currency support
-- **Narratives**: Title, description, sector, organization, location, and result narratives
-- **Organizations**: 200+ reporting and participating organizations
+### Primary Sources
+
+**IATI Datastore** - The foundation for bilateral and multilateral aid tracking
+- **Purpose**: Captures detailed aid activities from 200+ donors and implementers with rich narrative descriptions
+- **Coverage**: ~9,000 aid activities in Jordan (2010-2024) including bilateral, multilateral, and NGO funding
+- **Unique Value**: Only source with detailed narrative descriptions enabling automated classification of refugee targeting
+- **Limitations**: Voluntary reporting standard with variable data quality; some major donors underrepresent certain funding channels
+- **API Access**: https://iatistandard.org/en/iati-tools-and-resources/iati-datastore/
+
+**Federal Reserve Exchange Rate Data** - Essential for multi-currency financial analysis
+- **Purpose**: Converts all financial flows to comparable USD values using historically accurate exchange rates
+- **Coverage**: Daily exchange rates for major currencies (2010-2025) plus special handling for pegged currencies
+- **Unique Value**: Enables accurate temporal analysis of funding trends across different donor currencies
+- **Limitations**: Some minor currencies require manual rate sourcing; exchange rate timing may not match exact transaction dates
+- **Data Source**: https://www.federalreserve.gov/releases/h10/hist/
+
+**UN OCHA Financial Tracking Service (FTS)** - Validation and humanitarian funding context
+- **Purpose**: Provides comprehensive humanitarian funding data for cross-validation and gap analysis
+- **Coverage**: Syrian Regional Refugee and Resilience Plan (3RP) funding 2013-2024 across all host countries
+- **Unique Value**: Authoritative source for humanitarian funding with detailed appeal and sector breakdowns
+- **Limitations**: Focuses primarily on humanitarian funding; limited development assistance coverage
+- **Data Access**: [Syrian 3RP Funding Data](https://fts.unocha.org/plans/1168/flows?f%5B0%5D=flowStatus%3Apaid)
+
+**UNHCR Refugee Registration Data** - Population context for funding analysis
+- **Purpose**: Provides official refugee population figures for calculating per-capita funding and understanding demographic trends
+- **Coverage**: Monthly registered Syrian refugee populations in Jordan (2012-2024)
+- **Unique Value**: Only authoritative source for refugee population denominators in funding efficiency analysis
+- **Limitations**: Registered refugees may undercount total refugee population; doesn't capture host community demographics
+- **Data Access**: [UNHCR Jordan Refugee Data](https://data.unhcr.org/en/situations/syria/location/36)
+
+### Data Integration Strategy
+
+These sources complement each other to address individual limitations:
+
+**IATI + FTS Integration**: IATI captures bilateral and development funding often missing from FTS, while FTS provides comprehensive humanitarian funding that may be underreported in IATI. Together they offer more complete funding coverage.
+
+**Multi-currency Standardization**: Federal Reserve data enables accurate comparison of funding from different donors (EUR, GBP, JPY, etc.) over time, critical for understanding real funding trends versus nominal amounts.
+
+**Population Context**: UNHCR data provides the demographic foundation for calculating funding per refugee, identifying periods of underfunding relative to population growth, and understanding the relationship between refugee arrivals and donor response.
+
+**Narrative Classification**: IATI's rich narrative fields enable automated identification of refugee-specific funding within broader Jordan aid portfolios, something impossible with aggregate financial data alone.
+
+### Data Quality and Coverage
+
+**Temporal Coverage**: 2010-2024 with strongest coverage from 2012 onwards (coinciding with Syrian crisis escalation)
+**Geographic Scope**: Jordan-focused with regional context from 3RP data
+**Financial Scope**: $2.8+ billion in tracked funding across humanitarian and development assistance
+**Organizational Coverage**: 200+ reporting organizations including bilateral donors, UN agencies, international NGOs, and government entities
+**Classification Accuracy**: 91.8% weighted accuracy in automated refugee-targeting identification
+
+### Known Limitations
+
+**Reporting Gaps**: Some bilateral funding channels and private donations may be underrepresented in IATI
+**Currency Timing**: Exchange rate matching uses nearest-date approximation which may introduce minor inaccuracies
+**Population Undercounting**: UNHCR figures represent registered refugees only; actual refugee populations may be higher
+**Classification Scope**: Automated classification focuses on explicit refugee targeting; indirect benefits to refugees may be missed
 
 ## Model Performance
 
