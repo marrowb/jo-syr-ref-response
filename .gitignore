@@ -2,9 +2,11 @@
 .env
 .aider*
 __pycache__/
-mlruns/
 *.sqlite
 archive/
 bak/
 jordan_activities_all_fields.json
-mlrun/
+models/
+traces/
+mlruns/
+
