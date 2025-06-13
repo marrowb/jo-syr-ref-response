@@ -1,7 +1,6 @@
 import os
 import csv
 import random
-from IPython import embed
 
 import orjson
 import pandas as pd
@@ -207,8 +206,10 @@ def main():
     tf = clean_iati_transaction_data("transactions_cleaned.csv", iati_ids)
 
     tf = convert_all_to_usd(tf)
-
-    embed(banner1="End of Main")
+    print("done")
+    # import IPython
+    #
+    # IPython.embed(banner1="End of Main")
 
 
 if __name__ == "__main__":

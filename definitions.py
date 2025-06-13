@@ -41,3 +41,4 @@ MLFLOW_SERVER_URI = f"http://127.0.0.1:{MLFLOW_SERVER_PORT}"
 FED_RESERVE_XR_DOWNLOAD_URL = "https://www.federalreserve.gov/datadownload/Output.aspx?rel=H10&series=25446e0c08b895df9e2e9299476a292b&lastobs=&from=01/01/2010&to=06/09/2025&filetype=csv&label=include&layout=seriescolumn"
 
 JOD_PEGGED_USD = 1.41044
+SAR_PEGGED_USD = 0.26666
