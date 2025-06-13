@@ -1,0 +1,15 @@
+artifact_uri: file:///home/shuba/repos/jordan-funding/iati/mlruns/784254241032859446/f23ec45b5fb94aeeaa22d49c315cf4f6/artifacts
+end_time: 1749004701824
+entry_point_name: ''
+experiment_id: '784254241032859446'
+lifecycle_stage: active
+run_id: f23ec45b5fb94aeeaa22d49c315cf4f6
+run_name: popular-sloth-279
+run_uuid: f23ec45b5fb94aeeaa22d49c315cf4f6
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1749004558219
+status: 3
+tags: []
+user_id: shuba
