@@ -149,245 +149,56 @@ cp .env.example .env
 ├── definitions.py                      # Configuration and constants
 └── requirements.txt                    # Python dependencies
 ```
+## Pipeline
 
-## Usage Examples
+### Fetching Jordan Activities
+Fetch all aid activities where Jordan is the main recipient country or is listed as a recipient of one of the activity's transactions. 
+```py
+from lib.iati_datastore_utils import *
+from lib.util_file import *
+from definitions import ROOT_DIR
 
-### Basic Classification
-
-```python
-import asyncio
-from iati.dspy_run import setup_dspy_config, batch_classify, load_saved_model
-from lib.util_file import read_json
-
-# Setup DSPy configuration
-setup_dspy_config()
-
-# Load activities data
-activities = read_json("data/iati/jordan_activities_narratives.json")
-
-# Run batch classification
-await batch_classify(
-    model_path="models/aid_classifier_85_2024-12-15_14:30:22.json",
-    activities=activities[:100],  # Process first 100 activities
-    batch_size=10
-)
-```
-
-### Training a New Model
-
-```python
-from iati.dspy_run import train_classification_model, setup_dspy_config
-from lib.util_file import read_json
-
-# Setup configuration and MLflow tracking
-setup_dspy_config()
-
-# Train model on human-labeled data
-# Requires data/iati/model/jordan_activities_labeled.json
-trained_model = train_classification_model()
-
-# Model automatically saved with performance score and timestamp
-print(f"Model saved with score: {trained_model.score}")
-```
-
-### Interactive Label Validation
-
-```python
-from lib.util_labels import LabelValidator
-
-# Create validator instance
-validator = LabelValidator()
-
-# Review and correct model predictions
-validator.review_activities(
-    input_file="data/training_pre_human.json",
-    output_file="data/training_corrected.json"
-)
-
-# Commands during review:
-# 'e' - Edit current activity
-# 'f 1' - Quick edit field 1 (refugee groups)
-# 'notes' - Add notes about classification decisions
-# 'unclear' - Mark activity as unclear/unrelated
-# 'q' - Save and quit
-```
-
-### Currency Conversion Pipeline
-
-```python
-from iati.iati_build_usd_transactions import main as build_transactions
-from lib.util_xr import convert_all_to_usd, spot_check_xr_matching
-import pandas as pd
-
-# Build USD transaction dataset
-build_transactions()
-
-# Spot check exchange rate accuracy
-result = spot_check_xr_matching(
-    date="2023-06-15", 
-    currency="EUR", 
-    expected_rate=1.0875
-)
-print(f"Rate check: {result}")
-```
-
-## IATI Datastore API Wrapper
-
-This project includes a comprehensive wrapper for the IATI Datastore API that simplifies querying and data retrieval. The wrapper handles authentication, pagination, error handling, and provides convenient query builders for common use cases.
-
-### Key Features
-
-- **Session Management**: Configurable HTTP sessions with timeout and retry logic
-- **Query Builders**: Helper functions for complex multi-field queries
-- **Pagination Support**: Automatic handling of large result sets with `fetch_all=True`
-- **Preview Mode**: Quick data exploration with `preview=True`
-- **Count Queries**: Efficient result counting with `count_only=True`
-- **Error Handling**: Robust exception handling and status code validation
-
-### Basic Usage
-
-```python
-from lib.iati_datastore_utils import query_collection, build_combined_query
-
-# Simple query for activities in Jordan
 jordan_params = build_combined_query(
     recipient_country_codes=["JO"],
-    fl=["iati_identifier", "title_narrative", "description_narrative"]
-)
+    fl=["*"])
 
-# Get count of matching activities
 num_results, docs = query_collection("activity", jordan_params, count_only=True)
-print(f"Found {num_results} activities")
-
-# Preview first 5 results
-num_results, docs = query_collection("activity", jordan_params, preview=True)
-
-# Fetch all results (handles pagination automatically)
-num_results, all_docs = query_collection("activity", jordan_params, fetch_all=True)
+output_path = os.path.join(ROOT_DIR, "data", "iati", "jordan_activities_all_fields.json")
+write_json(docs, output_path)
 ```
 
-### Advanced Query Building
+### Classifying Refugee Related Activities
+- Explain how data is classified using `dspy_run.py`
 
-```python
-# Complex multi-criteria query
-complex_params = build_combined_query(
-    recipient_country_codes=["JO", "LB", "TR"],  # Multiple countries
-    sector_codes=["72010", "72040"],             # Emergency response sectors
-    humanitarian_plan_codes=["HSDN18"],          # Specific humanitarian plan
-    transaction_types=["D", "C"],                # Disbursements and commitments
-    fl=["iati_identifier", "title_narrative", "sector_narrative", 
-        "humanitarian_scope_narrative", "transaction_value"]
-)
+### Filtering Activities Dataset
+- explain filtering decisions based on these lines and functions in iati_build_usd_transactions
+```py
+    df = load_data()
+    df = filter_syria_ref_activities(df)
+    df = filter_duplicates(df)
 
-# Query with additional filters
-params_with_filters = build_combined_query(
-    recipient_country_codes=["JO"],
-    additional_query_params='activity_status_code:"2"',  # Active activities only
-    fl=["iati_identifier", "title_narrative", "activity_status_code"]
-)
 ```
 
-### Fetching Jordan Aid Activities
+### Retrieving Tranasctions Data
+```py
 
-The project's core dataset was built by querying all aid activities where Jordan appears as either:
-1. **Activity-level recipient country** (`recipient_country_code:"JO"`)
-2. **Transaction-level recipient country** (`transaction_recipient_country_code:"JO"`)
-
-This comprehensive approach captures both activities explicitly targeted at Jordan and those with individual transactions flowing to Jordan.
-
-```python
-# Query used to build the Jordan dataset
-jordan_params = build_combined_query(
-    recipient_country_codes=["JO"],  # Includes both activity and transaction level
-    fl=[
-        # Core identification
-        "iati_identifier", "title_narrative", "description_narrative",
-        
-        # Activity metadata  
-        "activity_status_code", "sector_code", "sector_narrative",
-        
-        # Humanitarian context
-        "humanitarian_scope_type", "humanitarian_scope_code", 
-        "humanitarian_scope_narrative",
-        
-        # Financial transactions
-        "transaction_value", "transaction_value_currency", 
-        "transaction_value_value_date", "transaction_transaction_type_code",
-        
-        # Organizational information
-        "transaction_provider_org_ref", "transaction_provider_org_type",
-        "transaction_provider_org_narrative", "transaction_transaction_date_iso_date"
-    ]
-)
-
-# Execute the query
-num_results, jordan_activities = query_collection(
-    "activity", 
-    jordan_params, 
-    fetch_all=True
-)
-
-print(f"Retrieved {len(jordan_activities)} activities for Jordan")
-# Result: 9,187 activities spanning 2010-2024
+    path = build_transaction_csv_from_datastore(iati_ids)
 ```
 
-### API Wrapper Functions
-
-#### Core Functions
-- `query_collection()`: Main interface for querying activity, budget, or transaction collections
-- `make_api_request()`: Low-level HTTP request handler with error handling
-- `create_request_session()`: Configurable session factory for API requests
-
-#### Query Builders
-- `build_combined_query()`: Comprehensive query builder for multiple criteria
-- `build_sector_query()`: DAC sector code queries
-- `build_humanitarian_scope_query()`: Humanitarian plan and emergency queries  
-- `build_recipient_country_query()`: Country-specific queries with transaction support
-- `build_transaction_type_query()`: Filter by transaction types (disbursements, commitments, etc.)
-
-#### Utility Functions
-- `ping_api()`: Test API connectivity
-- `check_identifiers()`: Validate IATI identifier existence
-- `get_docs()` / `get_num_results()`: Extract data from API responses
-
-### Error Handling and Rate Limiting
-
-The wrapper includes robust error handling for common API issues:
-
-```python
-try:
-    num_results, docs = query_collection("activity", params, fetch_all=True)
-except requests.exceptions.RequestException as e:
-    print(f"API request failed: {e}")
-except ValueError as e:
-    print(f"Invalid query parameters: {e}")
-```
-
-**Built-in Features:**
-- Automatic retry logic for transient failures
-- Rate limiting compliance (1000 rows per request max)
-- Timeout handling (30 second default)
-- Status code validation with meaningful error messages
-
-### Data Validation
-
-```python
-# Verify data completeness
-activities_with_narratives = [
-    activity for activity in jordan_activities 
-    if activity.get("title_narrative") or activity.get("description_narrative")
-]
-
-print(f"Activities with narrative content: {len(activities_with_narratives)}")
-# Result: 100% of Jordan activities have at least title or description
+### Converting Transaction Values to USD
+```py
+    tf = convert_all_to_usd(tf)
 ```
 
 ## Data Sources
 
 ### Primary Sources
 - **IATI Datastore**: 40+ narrative fields from aid activities in Jordan
+    - https://iatistandard.org/en/iati-tools-and-resources/iati-datastore/
 - **Federal Reserve**: Daily exchange rates for major currencies (2010-2025)
+    - Free exchange rate data historical: https://www.federalreserve.gov/releases/h10/hist/
 - **OCHA FTS**: UN humanitarian funding data for validation and context
+    - Add links from above
 
 ### Data Coverage
 - **Activities**: ~9,000 aid activities in Jordan (2010-2024)
@@ -419,163 +230,9 @@ Current performance on validation set (80/20 split):
 - **Model Robustness**: High weighted score (91.8%) demonstrates strong performance on priority classification tasks
 - **Data Quality Impact**: Consistent high performance across narrative completeness levels
 
-## Key Commands
-
-### Main Pipeline Operations
-```bash
-# Start MLflow server and run full classification pipeline
-python iati/dspy_run.py
-
-# Build sample for human labeling (first step)
-python -c "from iati.dspy_run import build_sample_for_labeling; build_sample_for_labeling()"
-
-# Train model on labeled data
-python -c "from iati.dspy_run import train_classification_model; train_classification_model()"
 ```
 
-### Data Processing
-```bash
-# Build USD transaction dataset with exchange rate conversion
-python iati/iati_build_usd_transactions.py
-
-# Validate IATI API connectivity
-python lib/iati_datastore_utils.py
-```
-
-### Label Management
-```bash
-# Validate existing labels for errors
-python -m lib.util_labels validate data/iati/model/jordan_activities_labeled.json
-
-# Interactive label correction and review
-python -m lib.util_labels review data/training_pre_human.json data/training_corrected.json
-
-# Show label statistics and distribution
-python -m lib.util_labels stats data/training_corrected.json
-```
-
-### MLflow Tracking
-```bash
-# View experiment results (after starting MLflow server)
-# Navigate to http://127.0.0.1:5050 in browser
-
-# Compare model performance across runs
-# Use MLflow UI to analyze metrics and failed predictions
-```
-
-## Configuration
-
-Key settings in `definitions.py`:
-
-### Model Configuration
-```python
-DSPY_CONFIG = {
-    "strong_model": "gemini/gemini-2.5-pro-preview-05-06",  # Training
-    "task_model": "gemini/gemini-2.0-flash",               # Inference  
-    "sample_size": 100,                                    # Training sample
-    "train_test_split": 0.8,                              # 80/20 split
-}
-```
-
-### Processing Limits
-- **Batch Size**: 10-50 activities per batch (rate limiting)
-- **Concurrent Requests**: 10 simultaneous API calls
-- **Retry Logic**: 3 attempts with exponential backoff
-- **Progress Persistence**: Resume from interruptions
-
-### Exchange Rate Configuration
-- **Pegged Currencies**: JOD (1.41044 USD), SAR (0.26666 USD)
-- **Data Source**: Federal Reserve H.10 series
-- **Update Frequency**: Daily rates with nearest-date matching
-- **Special Handling**: CZK manual rates for specific dates
-
-## Contributing
-
-### Adding New Classification Fields
-
-1. **Update Classifier Signature** (`lib/dspy_classifier.py`):
-```python
-class IATIClassifier(dspy.Signature):
-    # Add new output field
-    llm_new_field: List[Literal["option1", "option2"]] = dspy.OutputField(
-        desc="Detailed description of classification logic..."
-    )
-```
-
-2. **Update Validation** (`lib/util_labels.py`):
-```python
-class LabelValidator:
-    def __init__(self):
-        self.valid_new_field = ["option1", "option2"]
-        self.label_fields.append("llm_new_field")
-```
-
-3. **Update Metrics** (`lib/dspy_metrics.py`):
-```python
-# Add field to weighted_metric and field_specific_metrics
-field_weights["llm_new_field"] = 2.0  # Set appropriate weight
-```
-
-### Improving Model Prompts
-
-- **Field Descriptions**: Focus on explicit criteria and edge cases
-- **Examples**: Include positive and negative examples in docstrings  
-- **Constraints**: Use Literal types for controlled vocabularies
-- **Logic**: Emphasize conservative classification to reduce false positives
-
-### Data Validation Procedures
-
-1. **Automated Validation**: Run `python -m lib.util_labels validate` on all datasets
-2. **Human Review**: Use interactive validator for 10-20% sample validation
-3. **Cross-validation**: Compare results across different model versions
-4. **Domain Expert Review**: Engage humanitarian practitioners for edge cases
-
-### Testing Requirements
-
-- **Unit Tests**: Test individual utility functions and API clients
-- **Integration Tests**: Validate end-to-end pipeline with sample data
-- **Performance Tests**: Benchmark classification speed and accuracy
-- **Data Quality Tests**: Verify exchange rate accuracy and API responses
-
-## Troubleshooting
-
-### Common Issues
-
-**API Rate Limiting**:
-```bash
-# Reduce batch size in batch_classify()
-await batch_classify(model_path="...", activities=data, batch_size=5)
-```
-
-**Memory Issues with Large Datasets**:
-```python
-# Process in smaller chunks
-for i in range(0, len(activities), 1000):
-    chunk = activities[i:i+1000]
-    await batch_classify(model_path="...", activities=chunk)
-```
-
-**Exchange Rate Lookup Failures**:
-```python
-# Check specific currency/date combinations
-from lib.util_xr import spot_check_xr_matching
-result = spot_check_xr_matching("2023-01-15", "EUR")
-print(result)
-```
-
-**MLflow Server Issues**:
-```bash
-# Kill existing MLflow processes
-pkill -f "mlflow server"
-
-# Restart with clean state
-python iati/dspy_run.py
-```
-
-## License & Acknowledgments
-
-### License
-This project is licensed under the MIT License - see the LICENSE file for details.
+## Acknowledgments
 
 ### Acknowledgments
 
@@ -585,17 +242,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - **UNHCR & UNRWA**: Refugee data and context for validation
 - **Federal Reserve**: Exchange rate data for accurate financial analysis
 
-### Research Context
-
-This project supports research on:
-- Humanitarian aid effectiveness and coordination
-- Refugee assistance funding flows and gaps
-- Humanitarian-development nexus programming
-- Aid transparency and accountability mechanisms
-
-### Publications
-
-*[Add relevant publications, conference presentations, or reports that use this work]*
 
 ### Contact
 
