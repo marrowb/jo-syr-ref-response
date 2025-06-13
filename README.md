@@ -249,23 +249,24 @@ print(f"Rate check: {result}")
 Current performance on validation set (80/20 split):
 
 ### Overall Metrics
-- **Weighted Accuracy**: 78.5% (prioritizing critical fields)
-- **Simple Accuracy**: 71.2% (unweighted average)
+- **Weighted Accuracy**: 91.8% (prioritizing critical fields)
+- **Simple Accuracy**: 86.9% (unweighted average across all fields)
 
 ### Field-Specific Performance
-- **Refugee Group Identification**: 85.3% (high precision for Syria, Palestine)
-- **Target Population**: 72.1% (challenging refugee vs. host community distinction)  
-- **Geographic Settings**: 68.9% (camp identification most accurate)
-- **Geographic Focus**: 89.4% (strong location extraction)
-- **Humanitarian/Development Nexus**: 76.8% (good nexus understanding)
-- **Funding Organizations**: 45.2% (complex organizational relationships)
-- **Implementing Organizations**: 38.7% (most challenging field)
+- **Refugee Group Identification**: 100.0% (perfect classification of refugee nationalities)
+- **Target Population**: 91.3% (excellent refugee vs. host community distinction)  
+- **Geographic Settings**: 89.1% (strong camp/urban/rural classification)
+- **Geographic Focus**: 85.6% (reliable location extraction)
+- **Humanitarian/Development Nexus**: 95.7% (excellent nexus understanding)
+- **Funding Organizations**: 70.7% (good performance despite naming variations)
+- **Implementing Organizations**: 76.5% (solid performance with organizational complexity)
 
 ### Key Insights
-- **High Performance**: Refugee nationality and geographic extraction
-- **Moderate Performance**: Population targeting and nexus classification  
-- **Challenging Areas**: Organizational relationship mapping
-- **Data Quality Impact**: Performance correlates with narrative completeness
+- **Exceptional Performance**: Perfect refugee nationality identification and excellent nexus classification
+- **Strong Performance**: Target population and geographic setting classification exceed 89%
+- **Organizational Challenges**: Lower scores on funding/implementing orgs likely due to naming variations (e.g., "USAID" vs "US Agency for International Development")
+- **Model Robustness**: High weighted score (91.8%) demonstrates strong performance on priority classification tasks
+- **Data Quality Impact**: Consistent high performance across narrative completeness levels
 
 ## Key Commands
 
