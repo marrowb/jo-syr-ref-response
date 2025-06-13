@@ -3,9 +3,7 @@
 .aider*
 __pycache__/
 mlruns/
-mlrun/
 *.sqlite
 archive/
 bak/
-reference/
-data/
+jordan_activities_all_fields.json
