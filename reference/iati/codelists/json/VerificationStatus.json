@@ -1,1 +1,3 @@
-{"attributes": {"name": "VerificationStatus", "complete": "1", "embedded": "0", "category-codelist": null}, "metadata": {"name": "Verification Status", "description": "", "category": "Non-Core", "url": ""}, "data": [{"code": "0", "name": "Not verified", "description": "The data published for the activity has not been verified", "status": "active"}, {"code": "1", "name": "Verified", "description": "The data published for the activity has been verified.", "status": "active"}]}
+version https://git-lfs.github.com/spec/v1
+oid sha256:6366accd1a3942b2f8f9b164b574400a282e3625c1ae582fd76436a22da034c9
+size 479

@@ -1,1 +1,3 @@
-{"attributes": {"name": "HumanitarianScopeType", "complete": "0", "embedded": "0", "category-codelist": null}, "metadata": {"name": "Humanitarian Scope Type", "description": "\n                The Humanitarian Scope Type codelist defines codes for types of humanitarian events and actions.\n            ", "category": "Non-Core", "url": ""}, "data": [{"code": "1", "name": "Emergency", "status": "active"}, {"code": "2", "name": "Appeal", "status": "active"}]}
+version https://git-lfs.github.com/spec/v1
+oid sha256:e4120745e56de4672e975120ed34c0f3a3b5854ae6ea0dfb77f88bfda2e29a51
+size 460

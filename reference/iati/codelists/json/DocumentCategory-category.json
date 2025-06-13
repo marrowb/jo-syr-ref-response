@@ -1,1 +1,3 @@
-{"attributes": {"name": "DocumentCategory-category", "complete": "1", "embedded": "0", "category-codelist": null}, "metadata": {"name": "Document Category (category)", "description": "This codelists exists to group the Document Category codelist into categories. It is not used as a codelist in its own right.", "category": "Non-Core", "url": ""}, "data": [{"code": "A", "name": "Activity Level", "description": "The document is relevant to a specific activity", "status": "active"}, {"code": "B", "name": "Organisation Level", "description": "The document is relevant to the organisation as a whole", "status": "active"}]}
+version https://git-lfs.github.com/spec/v1
+oid sha256:175c317f52b1806b50fe4e72ae04129d86785406a117787b55da42e5d8e89639
+size 623

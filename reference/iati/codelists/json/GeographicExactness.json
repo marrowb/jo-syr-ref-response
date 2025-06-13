@@ -1,1 +1,3 @@
-{"attributes": {"name": "GeographicExactness", "complete": "1", "embedded": "0", "category-codelist": null}, "metadata": {"name": "Geographic Exactness", "description": null, "category": "Non-Core", "url": ""}, "data": [{"code": "1", "name": "Exact", "description": "The designated geographic location is exact", "status": "active"}, {"code": "2", "name": "Approximate", "description": "The designated geographic location is approximate", "status": "active"}]}
+version https://git-lfs.github.com/spec/v1
+oid sha256:92ac9b28b5dd2cb7018d7912d1f65f67e0dfd7c86097e95587a5bb396c03d9ba
+size 460

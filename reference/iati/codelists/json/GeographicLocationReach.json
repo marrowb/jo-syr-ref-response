@@ -1,1 +1,3 @@
-{"attributes": {"name": "GeographicLocationReach", "complete": "1", "embedded": "0", "category-codelist": null}, "metadata": {"name": "Geographic Location Reach", "description": null, "category": "Non-Core", "url": ""}, "data": [{"code": "1", "name": "Activity", "description": "The location specifies where the activity is carried out", "status": "active"}, {"code": "2", "name": "Intended Beneficiaries", "description": "The location specifies where the intended beneficiaries of the activity live", "status": "active"}]}
+version https://git-lfs.github.com/spec/v1
+oid sha256:f33bba298eb0f367418fbabf993b879a67f41a81354f01861e6899133a77c9e3
+size 523

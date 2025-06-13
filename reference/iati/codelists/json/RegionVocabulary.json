@@ -1,1 +1,3 @@
-{"attributes": {"name": "RegionVocabulary", "complete": "1", "embedded": "0", "category-codelist": null}, "metadata": {"name": "Region Vocabulary", "description": "", "category": "Non-Core", "url": ""}, "data": [{"code": "1", "url": "http://reference.iatistandard.org/codelists/Region/", "name": "OECD DAC", "description": "Supra-national regions according to OECD DAC CRS recipient codes", "status": "active"}, {"code": "2", "url": "https://unstats.un.org/unsd/methodology/m49/", "name": "UN", "description": "Supra-national regions maintained by UN Statistics Division (M49 standard)", "status": "active"}, {"code": "99", "name": "Reporting Organisation", "description": "The region reported corresponds to a region vocabulary maintained by the reporting organisation for this activity.", "status": "active"}]}
+version https://git-lfs.github.com/spec/v1
+oid sha256:a043d9b6d138efe4f39d9a4c552a63f8a9be790859ef6789fe53b6906c7c583c
+size 812

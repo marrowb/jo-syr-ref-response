@@ -1,1 +1,3 @@
-{"attributes": {"name": "GazetteerAgency", "complete": "1", "embedded": "1", "category-codelist": null}, "metadata": {"name": "Gazetteer Agency", "description": "An online resource that holds coordinates and descriptions of geographic locations ", "category": "Core", "url": ""}, "data": [{"code": "1", "name": "Geonames.org", "status": "active"}, {"code": "2", "name": "National Geospatial-Intelligence Agency", "status": "active"}, {"code": "3", "name": "Open Street Map", "status": "active"}]}
+version https://git-lfs.github.com/spec/v1
+oid sha256:14d2d6395f48494d45d9f208698196dfdb0598e2602936dc514046724f1829c6
+size 496

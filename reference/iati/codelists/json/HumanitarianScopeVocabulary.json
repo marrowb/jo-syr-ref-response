@@ -1,1 +1,3 @@
-{"attributes": {"name": "HumanitarianScopeVocabulary", "complete": "0", "embedded": "0", "category-codelist": null}, "metadata": {"name": "Humanitarian Scope Vocabulary", "description": "\n                The Humanitarian Scope Vocabulary codelist defines a range of external codelists which themselves provide codes and descriptions for humanitarian events and actions.\n            ", "category": "Non-Core", "url": ""}, "data": [{"code": "1-2", "url": "http://glidenumber.net/glide/public/search/search.jsp", "name": "Glide", "status": "active"}, {"code": "2-1", "url": "https://fts.unocha.org/plan-code-list-iati", "name": "Humanitarian Plan", "status": "active"}, {"code": "99", "name": "Reporting Organisation", "status": "active"}]}
+version https://git-lfs.github.com/spec/v1
+oid sha256:b3ade5c1bc58d68f0ad3ad76a6b3ae45dcedf03bc6d519c0d7b5fecf8dd2009e
+size 739

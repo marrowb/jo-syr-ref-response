@@ -1,1 +1,3 @@
-{"attributes": {"name": "PolicyMarkerVocabulary", "complete": "1", "embedded": "0", "category-codelist": null}, "metadata": {"name": "Policy Marker Vocabulary", "description": "", "category": "Non-Core", "url": ""}, "data": [{"code": "1", "url": "http://reference.iatistandard.org/codelists/PolicyMarker/", "name": "OECD DAC CRS", "description": "The policy marker is an OECD DAC CRS policy marker, Reported in columns 20-23, 28-31 and 54 of CRS++ reporting format.", "status": "active"}, {"code": "99", "name": "Reporting Organisation", "description": "The policy marker is one that is defined and tracked by the reporting organisation", "status": "active"}]}
+version https://git-lfs.github.com/spec/v1
+oid sha256:426df3d6128b4218388b52bc49d75e6bd509a06f061a4a5c9913fb4d85b842e8
+size 660
