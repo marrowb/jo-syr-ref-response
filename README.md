@@ -200,7 +200,7 @@ df = filter_duplicates(df)
 
 **Deduplication**: The `filter_duplicates()` function removes duplicate activities that appear multiple times due to how we query the IATI Datastore API. Activities can be duplicated when they appear in multiple query results (e.g., both as Jordan recipients and in transaction-level targeting).
 
-This filtering typically reduces the dataset from ~9,000 total activities to ~1,500-2,000 Syrian refugee-related activities, creating a focused dataset for financial analysis.
+This filtering reduces the dataset from ~9,000 total activities to ~2,000 Syrian refugee-related activities, creating a focused dataset for financial analysis.
 
 ### 4. Retrieving Transaction Data
 
@@ -244,7 +244,7 @@ Understanding aid flows to Syrian refugees requires integrating multiple data so
 
 **IATI Datastore** - The foundation for bilateral and multilateral aid tracking
 - **Purpose**: Captures detailed aid activities from 200+ donors and implementers with rich narrative descriptions
-- **Coverage**: ~9,000 aid activities in Jordan (2010-2024) including bilateral, multilateral, and NGO funding
+- **Coverage**: ~9,000 aid activities in Jordan (current through Jun 2025) including bilateral, multilateral, and NGO funding
 - **Unique Value**: Only source with detailed narrative descriptions enabling automated classification of refugee targeting
 - **Limitations**: Voluntary reporting standard with variable data quality; some major donors underrepresent certain funding channels
 - **API Access**: https://iatistandard.org/en/iati-tools-and-resources/iati-datastore/
@@ -260,7 +260,7 @@ Understanding aid flows to Syrian refugees requires integrating multiple data so
 - **Purpose**: Provides comprehensive humanitarian funding data for cross-validation and gap analysis
 - **Coverage**: Syrian Regional Refugee and Resilience Plan (3RP) funding 2013-2024 across all host countries
 - **Unique Value**: Authoritative source for humanitarian funding with detailed appeal and sector breakdowns
-- **Limitations**: Focuses primarily on humanitarian funding; limited development assistance coverage
+- **Limitations**: Not as much detail regarding program activity as IATI. Doens't cover direct bilateral funding.
 - **Data Access**: [Syrian 3RP Funding Data](https://fts.unocha.org/plans/1168/flows?f%5B0%5D=flowStatus%3Apaid)
 
 **UNHCR Refugee Registration Data** - Population context for funding analysis
@@ -270,25 +270,6 @@ Understanding aid flows to Syrian refugees requires integrating multiple data so
 - **Limitations**: Registered refugees may undercount total refugee population; doesn't capture host community demographics
 - **Data Access**: [UNHCR Jordan Refugee Data](https://data.unhcr.org/en/situations/syria/location/36)
 
-### Data Integration Strategy
-
-These sources complement each other to address individual limitations:
-
-**IATI + FTS Integration**: IATI captures bilateral and development funding often missing from FTS, while FTS provides comprehensive humanitarian funding that may be underreported in IATI. Together they offer more complete funding coverage.
-
-**Multi-currency Standardization**: Federal Reserve data enables accurate comparison of funding from different donors (EUR, GBP, JPY, etc.) over time, critical for understanding real funding trends versus nominal amounts.
-
-**Population Context**: UNHCR data provides the demographic foundation for calculating funding per refugee, identifying periods of underfunding relative to population growth, and understanding the relationship between refugee arrivals and donor response.
-
-**Narrative Classification**: IATI's rich narrative fields enable automated identification of refugee-specific funding within broader Jordan aid portfolios, something impossible with aggregate financial data alone.
-
-### Data Quality and Coverage
-
-**Temporal Coverage**: 2010-2024 with strongest coverage from 2012 onwards (coinciding with Syrian crisis escalation)
-**Geographic Scope**: Jordan-focused with regional context from 3RP data
-**Financial Scope**: $2.8+ billion in tracked funding across humanitarian and development assistance
-**Organizational Coverage**: 200+ reporting organizations including bilateral donors, UN agencies, international NGOs, and government entities
-**Classification Accuracy**: 91.8% weighted accuracy in automated refugee-targeting identification
 
 ### Known Limitations
 
@@ -320,18 +301,6 @@ Current performance on validation set (80/20 split):
 - **Organizational Challenges**: Lower scores on funding/implementing orgs likely due to naming variations (e.g., "USAID" vs "US Agency for International Development")
 - **Model Robustness**: High weighted score (91.8%) demonstrates strong performance on priority classification tasks
 - **Data Quality Impact**: Consistent high performance across narrative completeness levels
-
-```
-
-## Acknowledgments
-
-### Acknowledgments
-
-- **IATI Standard**: International Aid Transparency Initiative for open aid data standards
-- **DSPy Framework**: Stanford NLP for the declarative programming framework  
-- **Google Gemini**: Advanced language models enabling sophisticated classification
-- **UNHCR & UNRWA**: Refugee data and context for validation
-- **Federal Reserve**: Exchange rate data for accurate financial analysis
 
 
 ### Contact
