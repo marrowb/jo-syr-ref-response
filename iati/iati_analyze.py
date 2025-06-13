@@ -13,6 +13,8 @@ from lib.util_xr import *
 from lib.iati_datastore_utils import query_collection, make_api_request
 from typing import List, Set, Tuple, Dict, Any, Optional
 
+from lib.util_xr import spot_check_xr_matching
+
 
 def load_data():
     data_path = os.path.join(
@@ -38,7 +40,7 @@ def filter_syria_ref_activities(df: pd.DataFrame) -> pd.DataFrame:
     ]
 
 
-def spot_check(df: pd.DataFrame, narratives: List = None):
+def spot_check_narrative(df: pd.DataFrame, narratives: List = None):
     """Spot check random elements in the data. Get llm fields, description, and title at a minimum."""
     ix = random.randrange(0, len(df))
     default = ["description_narrative", "title_narrative"]
@@ -82,7 +84,6 @@ def extract_transactions_from_activity_json(
             except (IndexError, TypeError):
                 transaction.append(None)
         transactions.append(tuple(transaction))
-    # embed(banner1="End of Extract Transactions")
     return transactions
 
 
@@ -111,7 +112,6 @@ def build_transaction_rows_from_all_activities_json(iati_ids: Set) -> pd.DataFra
                     print(f"Processed object {i}")
 
     df = pd.DataFrame(rows[1:], columns=rows[0])
-    embed(banner1="Got all Transactions")
     return df
 
 
@@ -207,9 +207,18 @@ def main():
 
     tf = convert_all_to_usd(tf)
     print("done")
-    # import IPython
-    #
-    # IPython.embed(banner1="End of Main")
+
+    sample = tf[tf["currency"] != "USD"][["currency", "date", "exchange_rate"]].sample(
+        30
+    )
+    for _, row in sample.iterrows():
+        currency = row["currency"]
+        date = row["date"]
+        rate = row["exchange_rate"]
+        print(spot_check_xr_matching(date, currency, expected_rate=rate))
+
+    output_path = os.path.join(ROOT_DIR, "data", "iati", "transactions_usd.csv")
+    tf.to_csv(output_path)
 
 
 if __name__ == "__main__":
