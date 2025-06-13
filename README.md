@@ -19,7 +19,7 @@ Cloning this git repo will allow this code to run smoothly. The data will only b
 
 ## Figures
 * [Funding vs. Total Individuals](./figures/contributions_vs_individuals.png)
-* [Funding per Refugees](./figures/contributions_vs_individuals.png)
+* [Funding per Refugee](./figures/contributions_vs_individuals.png)
 
 
 # IATI Aid Activity Classification Project
