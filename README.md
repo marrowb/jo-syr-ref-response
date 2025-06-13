@@ -18,8 +18,8 @@ Cloning this git repo will allow this code to run smoothly. The data will only b
 * Need to navigate to the funding page for each year from 2013-2024 and click the download button. Those Excel files are located [here]("./data/ocha-fts/")
 
 ## Figures
-[Funding vs. Total Individuals]("./figures/contributions_vs_individuals.png")
-[Funding per Refugees]("./figures/contributions_vs_individuals.png")
+[Funding vs. Total Individuals](./figures/contributions_vs_individuals.png)
+[Funding per Refugees](./figures/contributions_vs_individuals.png)
 
 
 # IATI Aid Activity Classification Project
