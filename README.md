@@ -231,6 +231,157 @@ result = spot_check_xr_matching(
 print(f"Rate check: {result}")
 ```
 
+## IATI Datastore API Wrapper
+
+This project includes a comprehensive wrapper for the IATI Datastore API that simplifies querying and data retrieval. The wrapper handles authentication, pagination, error handling, and provides convenient query builders for common use cases.
+
+### Key Features
+
+- **Session Management**: Configurable HTTP sessions with timeout and retry logic
+- **Query Builders**: Helper functions for complex multi-field queries
+- **Pagination Support**: Automatic handling of large result sets with `fetch_all=True`
+- **Preview Mode**: Quick data exploration with `preview=True`
+- **Count Queries**: Efficient result counting with `count_only=True`
+- **Error Handling**: Robust exception handling and status code validation
+
+### Basic Usage
+
+```python
+from lib.iati_datastore_utils import query_collection, build_combined_query
+
+# Simple query for activities in Jordan
+jordan_params = build_combined_query(
+    recipient_country_codes=["JO"],
+    fl=["iati_identifier", "title_narrative", "description_narrative"]
+)
+
+# Get count of matching activities
+num_results, docs = query_collection("activity", jordan_params, count_only=True)
+print(f"Found {num_results} activities")
+
+# Preview first 5 results
+num_results, docs = query_collection("activity", jordan_params, preview=True)
+
+# Fetch all results (handles pagination automatically)
+num_results, all_docs = query_collection("activity", jordan_params, fetch_all=True)
+```
+
+### Advanced Query Building
+
+```python
+# Complex multi-criteria query
+complex_params = build_combined_query(
+    recipient_country_codes=["JO", "LB", "TR"],  # Multiple countries
+    sector_codes=["72010", "72040"],             # Emergency response sectors
+    humanitarian_plan_codes=["HSDN18"],          # Specific humanitarian plan
+    transaction_types=["D", "C"],                # Disbursements and commitments
+    fl=["iati_identifier", "title_narrative", "sector_narrative", 
+        "humanitarian_scope_narrative", "transaction_value"]
+)
+
+# Query with additional filters
+params_with_filters = build_combined_query(
+    recipient_country_codes=["JO"],
+    additional_query_params='activity_status_code:"2"',  # Active activities only
+    fl=["iati_identifier", "title_narrative", "activity_status_code"]
+)
+```
+
+### Fetching Jordan Aid Activities
+
+The project's core dataset was built by querying all aid activities where Jordan appears as either:
+1. **Activity-level recipient country** (`recipient_country_code:"JO"`)
+2. **Transaction-level recipient country** (`transaction_recipient_country_code:"JO"`)
+
+This comprehensive approach captures both activities explicitly targeted at Jordan and those with individual transactions flowing to Jordan.
+
+```python
+# Query used to build the Jordan dataset
+jordan_params = build_combined_query(
+    recipient_country_codes=["JO"],  # Includes both activity and transaction level
+    fl=[
+        # Core identification
+        "iati_identifier", "title_narrative", "description_narrative",
+        
+        # Activity metadata  
+        "activity_status_code", "sector_code", "sector_narrative",
+        
+        # Humanitarian context
+        "humanitarian_scope_type", "humanitarian_scope_code", 
+        "humanitarian_scope_narrative",
+        
+        # Financial transactions
+        "transaction_value", "transaction_value_currency", 
+        "transaction_value_value_date", "transaction_transaction_type_code",
+        
+        # Organizational information
+        "transaction_provider_org_ref", "transaction_provider_org_type",
+        "transaction_provider_org_narrative", "transaction_transaction_date_iso_date"
+    ]
+)
+
+# Execute the query
+num_results, jordan_activities = query_collection(
+    "activity", 
+    jordan_params, 
+    fetch_all=True
+)
+
+print(f"Retrieved {len(jordan_activities)} activities for Jordan")
+# Result: 9,187 activities spanning 2010-2024
+```
+
+### API Wrapper Functions
+
+#### Core Functions
+- `query_collection()`: Main interface for querying activity, budget, or transaction collections
+- `make_api_request()`: Low-level HTTP request handler with error handling
+- `create_request_session()`: Configurable session factory for API requests
+
+#### Query Builders
+- `build_combined_query()`: Comprehensive query builder for multiple criteria
+- `build_sector_query()`: DAC sector code queries
+- `build_humanitarian_scope_query()`: Humanitarian plan and emergency queries  
+- `build_recipient_country_query()`: Country-specific queries with transaction support
+- `build_transaction_type_query()`: Filter by transaction types (disbursements, commitments, etc.)
+
+#### Utility Functions
+- `ping_api()`: Test API connectivity
+- `check_identifiers()`: Validate IATI identifier existence
+- `get_docs()` / `get_num_results()`: Extract data from API responses
+
+### Error Handling and Rate Limiting
+
+The wrapper includes robust error handling for common API issues:
+
+```python
+try:
+    num_results, docs = query_collection("activity", params, fetch_all=True)
+except requests.exceptions.RequestException as e:
+    print(f"API request failed: {e}")
+except ValueError as e:
+    print(f"Invalid query parameters: {e}")
+```
+
+**Built-in Features:**
+- Automatic retry logic for transient failures
+- Rate limiting compliance (1000 rows per request max)
+- Timeout handling (30 second default)
+- Status code validation with meaningful error messages
+
+### Data Validation
+
+```python
+# Verify data completeness
+activities_with_narratives = [
+    activity for activity in jordan_activities 
+    if activity.get("title_narrative") or activity.get("description_narrative")
+]
+
+print(f"Activities with narrative content: {len(activities_with_narratives)}")
+# Result: 100% of Jordan activities have at least title or description
+```
+
 ## Data Sources
 
 ### Primary Sources
